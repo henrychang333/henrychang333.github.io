@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>內嵌URL清單生成器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        
+        header {
+            background: #4b6cb7;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+        
+        .description {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        
+        .content {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        
+        .results-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        @media (max-width: 900px) {
+            .results-section {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .result-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            height: fit-content;
+        }
+        
+        .section-title {
+            font-size: 1.4rem;
+            color: #4b6cb7;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .file-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .file-item {
+            background: white;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            border-left: 5px solid #4b6cb7;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        }
+        
+        .file-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        }
+        
+        .file-link {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            height: 100%;
+            transition: all 0.3s ease;
+        }
+        
+        .file-link:hover {
+            background: #eef2f7;
+            color: #4b6cb7;
+        }
+        
+        .icon {
+            margin-right: 15px;
+            font-size: 1.5rem;
+            color: #4b6cb7;
+            min-width: 30px;
+            text-align: center;
+        }
+        
+        .file-info {
+            overflow: hidden;
+        }
+        
+        .file-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .file-url {
+            font-size: 0.85rem;
+            color: #666;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .external .icon {
+            color: #ff6b6b;
+        }
+        
+        .external {
+            border-left-color: #ff6b6b;
+        }
+        
+        .message {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .counter {
+            background: #4b6cb7;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-left: 10px;
+        }
+        
+        .editor-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .editor-title {
+            font-size: 1.4rem;
+            color: #4b6cb7;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .url-editor {
+            width: 100%;
+            min-height: 150px;
+            padding: 15px;
+            border: 1px solid #d9d9d9;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 1rem;
+            line-height: 1.5;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+        
+        .url-editor:focus {
+            outline: none;
+            border-color: #40a9ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+        
+        .editor-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            background: #4b6cb7;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(75, 108, 183, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn:hover {
+            background: #3a5999;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(75, 108, 183, 0.4);
+        }
+        
+        .btn-generate {
+            background: #28a745;
+        }
+        
+        .btn-generate:hover {
+            background: #218838;
+        }
+        
+        .btn-clear {
+            background: #dc3545;
+        }
+        
+        .btn-clear:hover {
+            background: #c82333;
+        }
+        
+        .btn-example {
+            background: #fd7e14;
+        }
+        
+        .btn-example:hover {
+            background: #e86103;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 25px;
+            color: #666;
+            font-size: 0.95rem;
+            border-top: 1px solid #eee;
+            background: #f8f9fa;
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .description {
+                font-size: 1rem;
+            }
+            
+            .editor-buttons {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Local URL List</h1>
+            <p class="description">直接在下方編輯URL清單，自動生成分類連結</p>
+        </header>
+        
+        <div class="content">
+            <div class="results-section">
+                <div id="localPanel" class="result-panel hidden">
+                    <h2 class="section-title">
+                        <i>📁</i>
+                        本地文件
+                        <span id="localCount" class="counter">0</span>
+                    </h2>
+                    <ul id="localList" class="file-list">
+                        <div class="message">請輸入URL並點擊"生成連結列表"</div>
+                    </ul>
+                </div>
+                
+                <div id="externalPanel" class="result-panel hidden">
+                    <h2 class="section-title">
+                        <i>🌐</i>
+                        外部連結
+                        <span id="externalCount" class="counter">0</span>
+                    </h2>
+                    <ul id="externalList" class="file-list">
+                        <div class="message">請輸入URL並點擊"生成連結列表"</div>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="editor-section">
+                <h2 class="editor-title">
+                    <i>📝</i>
+                    URL清單編輯區
+                </h2>
+                <textarea id="urlInput" class="url-editor" placeholder="請輸入URL列表，每行一個URL&#10;例如：&#10;https://example.com&#10;page1.html&#10;https://google.com&#10;document.pdf&#10;https://github.com">https://www.google.com
+https://www.wikipedia.org
+index.html
+about.html
+contact.html
+https://www.youtube.com
+https://github.com
+project1.html
+styles.css
+https://stackoverflow.com</textarea>
+                
+                <div class="editor-buttons">
+                    <button id="generateBtn" class="btn btn-generate">
+                        <i>🔄</i> 生成連結列表
+                    </button>
+                    <button id="clearBtn" class="btn btn-clear">
+                        <i>🗑️</i> 清空編輯區
+                    </button>
+                    <button id="exampleBtn" class="btn btn-example">
+                        <i>📋</i> 載入範例
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>本頁面自動生成於 <span id="currentDate"></span> | 內嵌URL清單版本</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 顯示當前日期
+            const currentDate = new Date().toLocaleDateString('zh-TW', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long'
+            });
+            document.getElementById('currentDate').textContent = currentDate;
+            
+            const urlInput = document.getElementById('urlInput');
+            const generateBtn = document.getElementById('generateBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const exampleBtn = document.getElementById('exampleBtn');
+            const localList = document.getElementById('localList');
+            const externalList = document.getElementById('externalList');
+            const localCount = document.getElementById('localCount');
+            const externalCount = document.getElementById('externalCount');
+            const localPanel = document.getElementById('localPanel');
+            const externalPanel = document.getElementById('externalPanel');
+            
+            // 預設URL清單
+            const defaultUrls = `
+https://www.google.com
+https://www.wikipedia.org
+index.html
+about.html
+contact.html
+https://www.youtube.com
+https://github.com
+project1.html
+styles.css
+https://stackoverflow.com
+`;
+            
+            // 範例URL清單
+            const exampleUrls = `# 網站連結
+https://www.example.com
+https://www.google.com
+https://www.github.com
+
+# 本地文件
+index.html
+about.html
+contact.html
+products.html
+
+# 文件資源
+document.pdf
+manual.docx
+guide.txt
+
+# 其他外部連結
+https://www.wikipedia.org
+https://stackoverflow.com
+https://www.youtube.com`;
+            
+            // 生成連結列表
+            function generateLinks() {
+                const content = urlInput.value;
+                if (!content.trim()) {
+                    alert('請輸入URL內容');
+                    return;
+                }
+                
+                processContent(content);
+            }
+            
+            // 處理內容
+            function processContent(content) {
+                // 清空現有列表
+                localList.innerHTML = '';
+                externalList.innerHTML = '';
+                
+                // 隱藏所有面板
+                localPanel.classList.add('hidden');
+                externalPanel.classList.add('hidden');
+                
+                // 按行分割內容
+                const lines = content.split(/\r?\n/);
+                const localLinks = [];
+                const externalLinks = [];
+                
+                // 分析每一行
+                lines.forEach(line => {
+                    // 移除前後空白字符
+                    line = line.trim();
+                    
+                    // 跳過空行和註釋行（以#開頭的行）
+                    if (!line || line.startsWith('#')) return;
+                    
+                    // 檢查是否是外部連結
+                    if (line.startsWith('http://') || 
+                        line.startsWith('https://') ||
+                        line.startsWith('//')) {
+                        externalLinks.push(line);
+                    } else {
+                        // 假設其他都是本地文件
+                        localLinks.push(line);
+                    }
+                });
+                
+                // 更新計數器
+                localCount.textContent = localLinks.length;
+                externalCount.textContent = externalLinks.length;
+                
+                // 顯示本地連結
+                if (localLinks.length > 0) {
+                    localPanel.classList.remove('hidden');
+                    localLinks.forEach(link => {
+                        const listItem = createListItem(link, false);
+                        localList.appendChild(listItem);
+                    });
+                } else {
+                    localPanel.classList.add('hidden');
+                }
+                
+                // 顯示外部連結
+                if (externalLinks.length > 0) {
+                    externalPanel.classList.remove('hidden');
+                    externalLinks.forEach(link => {
+                        const listItem = createListItem(link, true);
+                        externalList.appendChild(listItem);
+                    });
+                } else {
+                    externalPanel.classList.add('hidden');
+                }
+                
+                // 如果兩者都沒有內容，顯示提示
+                if (localLinks.length === 0 && externalLinks.length === 0) {
+                    localPanel.classList.remove('hidden');
+                    localList.innerHTML = '<div class="message">未找到有效的URL連結</div>';
+                }
+            }
+            
+            // 創建列表項
+            function createListItem(url, isExternal) {
+                const listItem = document.createElement('li');
+                listItem.className = `file-item ${isExternal ? 'external' : ''}`;
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.className = 'file-link';
+                link.target = isExternal ? '_blank' : '_self';
+                
+                // 文件圖標
+                const icon = document.createElement('span');
+                icon.className = 'icon';
+                icon.innerHTML = isExternal ? '🌐' : '📄';
+                
+                // 文件信息
+                const fileInfo = document.createElement('div');
+                fileInfo.className = 'file-info';
+                
+                const title = document.createElement('div');
+                title.className = 'file-title';
+                title.textContent = extractDomainOrFilename(url);
+                
+                const urlText = document.createElement('div');
+                urlText.className = 'file-url';
+                urlText.textContent = url;
+                
+                fileInfo.appendChild(title);
+                fileInfo.appendChild(urlText);
+                
+                link.appendChild(icon);
+                link.appendChild(fileInfo);
+                listItem.appendChild(link);
+                
+                return listItem;
+            }
+            
+            // 從URL中提取域名或文件名
+            function extractDomainOrFilename(url) {
+                if (url.startsWith('http://') || url.startsWith('https://')) {
+                    // 提取域名
+                    const matches = url.match(/^https?:\/\/([^\/]+)/);
+                    if (matches && matches[1]) {
+                        return matches[1].replace('www.', '');
+                    }
+                }
+                
+                // 提取文件名
+                const parts = url.split('/');
+                return parts[parts.length - 1];
+            }
+            
+            // 清空編輯區
+            function clearEditor() {
+                if (confirm('確定要清空編輯區嗎？')) {
+                    urlInput.value = '';
+                    localPanel.classList.add('hidden');
+                    externalPanel.classList.add('hidden');
+                    localList.innerHTML = '<div class="message">請輸入URL並點擊"生成連結列表"</div>';
+                    externalList.innerHTML = '<div class="message">請輸入URL並點擊"生成連結列表"</div>';
+                    localCount.textContent = '0';
+                    externalCount.textContent = '0';
+                }
+            }
+            
+            // 載入範例
+            function loadExample() {
+                urlInput.value = exampleUrls;
+                processContent(exampleUrls);
+            }
+            
+            // 綁定事件
+            generateBtn.addEventListener('click', generateLinks);
+            clearBtn.addEventListener('click', clearEditor);
+            exampleBtn.addEventListener('click', loadExample);
+            
+            // 初始化頁面時處理預設URL
+            processContent(defaultUrls);
+        });
+    </script>
+</body>
+</html>
