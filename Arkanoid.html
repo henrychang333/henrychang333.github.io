@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Arkanoid 全方位操控版</title>
+    <style>
+        body {
+            margin: 0; padding: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; height: 100vh;
+            background-color: #1a1a1a; color: white; overflow: hidden; touch-action: none;
+            font-family: sans-serif;
+        }
+        #gameContainer {
+            position: relative; width: 90vw; height: 160vw;
+            max-width: 405px; max-height: 720px;
+        }
+        canvas {
+            background: #000; display: block; width: 100%; height: 100%;
+            border: 3px solid #444; border-radius: 8px;
+        }
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 20;
+            text-align: center; border-radius: 8px; padding: 20px; box-sizing: border-box;
+        }
+        .btn {
+            padding: 15px 40px; font-size: 22px; background: #0095DD;
+            color: white; border: none; border-radius: 30px; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,149,221,0.4);
+        }
+        #scoreBoard { position: absolute; top: 10px; width: 100%; text-align: center; font-size: 20px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer">
+        <div id="scoreBoard">分數: 0</div>
+        <div id="overlay">
+            <h1 style="color:#0095DD">ARKANOID</h1>
+            <p style="line-height: 1.6;">
+                <b>[電腦控制]</b><br>
+                左右方向鍵 或 滑鼠移動<br>
+                空白鍵 射擊<br><br>
+                <b>[手機控制]</b><br>
+                滑動螢幕 移動<br>
+                點擊螢幕 射擊
+            </p>
+            <button class="btn" id="startBtn">開始遊戲</button>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const overlay = document.getElementById("overlay");
+    const startBtn = document.getElementById("startBtn");
+    const scoreBoard = document.getElementById("scoreBoard");
+
+    const GAME_W = 360;
+    const GAME_H = 640;
+    canvas.width = GAME_W;
+    canvas.height = GAME_H;
+
+    let gameStarted = false;
+    let isGameOver = false;
+    let score = 0;
+
+    // 擋板狀態
+    const paddle = {
+        w: 75, h: 12, x: (GAME_W - 75) / 2, y: GAME_H - 50,
+        color: "#0095DD", speed: 8, hasGun: false
+    };
+
+    // 輸入監測
+    const keys = { left: false, right: false };
+    
+    // 1. 鍵盤監聽
+    window.addEventListener("keydown", e => {
+        if (e.key === "ArrowLeft" || e.key === "Left") keys.left = true;
+        if (e.key === "ArrowRight" || e.key === "Right") keys.right = true;
+        if (e.code === "Space") shoot();
+    });
+    window.addEventListener("keyup", e => {
+        if (e.key === "ArrowLeft" || e.key === "Left") keys.left = false;
+        if (e.key === "ArrowRight" || e.key === "Right") keys.right = false;
+    });
+
+    // 2. 滑鼠監聽
+    window.addEventListener("mousemove", e => {
+        if(!gameStarted) return;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = GAME_W / rect.width;
+        paddle.x = (e.clientX - rect.left) * scaleX - paddle.w / 2;
+    });
+
+    // 3. 觸控監聽
+    window.addEventListener("touchmove", e => {
+        if(!gameStarted) return;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = GAME_W / rect.width;
+        paddle.x = (e.touches[0].clientX - rect.left) * scaleX - paddle.w / 2;
+        e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener("touchstart", () => { if(gameStarted) shoot(); });
+    window.addEventListener("mousedown", () => { if(gameStarted) shoot(); });
+
+    let balls = [];
+    let bricks = [];
+    let powerUps = [];
+    let bullets = [];
+
+    function initBricks() {
+        bricks = [];
+        const rows = 8;
+        const cols = 6;
+        for (let c = 0; c < cols; c++) {
+            for (let r = 0; r < rows; r++) {
+                bricks.push({
+                    x: c * 54 + 20, y: r * 22 + 60,
+                    w: 50, h: 18, status: 1,
+                    color: `hsl(${r * 32}, 70%, 50%)`
+                });
+            }
+        }
+    }
+
+    function shoot() {
+        if (paddle.hasGun) {
+            bullets.push({x: paddle.x + 5, y: paddle.y, w: 4, h: 10});
+            bullets.push({x: paddle.x + paddle.w - 9, y: paddle.y, w: 4, h: 10});
+        }
+    }
+
+    function startGame() {
+        overlay.style.display = "none";
+        gameStarted = true;
+        isGameOver = false;
+        score = 0;
+        paddle.w = 75;
+        paddle.hasGun = false;
+        balls = [{ x: GAME_W/2, y: GAME_H-70, dx: 3.5, dy: -3.5, radius: 7 }];
+        initBricks();
+        gameLoop();
+    }
+
+    function gameLoop() {
+        if (!gameStarted || isGameOver) return;
+        ctx.clearRect(0, 0, GAME_W, GAME_H);
+
+        // 更新鍵盤位移
+        if (keys.left) paddle.x -= paddle.speed;
+        if (keys.right) paddle.x += paddle.speed;
+        
+        // 邊界限制
+        if (paddle.x < 0) paddle.x = 0;
+        if (paddle.x > GAME_W - paddle.w) paddle.x = GAME_W - paddle.w;
+
+        // 畫磚塊
+        bricks.forEach(b => {
+            if (b.status === 1) {
+                ctx.fillStyle = b.color;
+                ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.strokeStyle = "rgba(0,0,0,0.2)";
+                ctx.strokeRect(b.x, b.y, b.w, b.h);
+            }
+        });
+
+        // 畫擋板
+        ctx.fillStyle = paddle.color;
+        ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+        if(paddle.hasGun) {
+            ctx.fillStyle = "#FF4500";
+            ctx.fillRect(paddle.x, paddle.y - 6, 6, 6);
+            ctx.fillRect(paddle.x + paddle.w - 6, paddle.y - 6, 6, 6);
+        }
+
+        // 球邏輯
+        balls.forEach((ball, bIdx) => {
+            ball.x += ball.dx; ball.y += ball.dy;
+            if (ball.x < ball.radius || ball.x > GAME_W - ball.radius) ball.dx *= -1;
+            if (ball.y < ball.radius) ball.dy *= -1;
+            
+            // 擋板碰撞
+            if (ball.y > paddle.y - ball.radius && ball.y < paddle.y + paddle.h &&
+                ball.x > paddle.x && ball.x < paddle.x + paddle.w) {
+                ball.dy = -Math.abs(ball.dy);
+                // 根據撞擊位置改變角度
+                let hitPoint = (ball.x - (paddle.x + paddle.w/2)) / (paddle.w/2);
+                ball.dx = hitPoint * 4;
+            }
+
+            // 磚塊碰撞
+            bricks.forEach(br => {
+                if (br.status === 1 && ball.x > br.x && ball.x < br.x + br.w && ball.y > br.y && ball.y < br.y + br.h) {
+                    br.status = 0; ball.dy *= -1;
+                    score += 10;
+                    scoreBoard.innerText = "分數: " + score;
+                    if (Math.random() < 0.2) spawnPowerUp(br.x, br.y);
+                }
+            });
+
+            if (ball.y > GAME_H) balls.splice(bIdx, 1);
+            
+            ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2);
+            ctx.fillStyle = "#FFF"; ctx.fill(); ctx.closePath();
+        });
+
+        // 道具與子彈
+        powerUps.forEach((p, i) => {
+            p.y += 2.5;
+            ctx.fillStyle = p.type === 'L' ? "#0f0" : (p.type === 'S' ? "#f44" : "#0ff");
+            ctx.fillRect(p.x, p.y, 22, 22);
+            ctx.fillStyle = "#000"; ctx.font = "bold 14px Arial";
+            ctx.fillText(p.type, p.x+6, p.y+17);
+
+            if (p.y > paddle.y && p.y < paddle.y + paddle.h && p.x > paddle.x && p.x < paddle.x + paddle.w) {
+                applyPowerUp(p.type);
+                powerUps.splice(i, 1);
+            }
+            if (p.y > GAME_H) powerUps.splice(i, 1);
+        });
+
+        bullets.forEach((bu, i) => {
+            bu.y -= 7;
+            ctx.fillStyle = "#FF4500"; ctx.fillRect(bu.x, bu.y, bu.w, bu.h);
+            bricks.forEach(br => {
+                if(br.status === 1 && bu.x > br.x && bu.x < br.x + br.w && bu.y < br.y + br.h && bu.y > br.y) {
+                    br.status = 0; bullets.splice(i, 1); score += 10;
+                    scoreBoard.innerText = "分數: " + score;
+                }
+            });
+            if (bu.y < 0) bullets.splice(i, 1);
+        });
+
+        if (balls.length === 0) {
+            isGameOver = true;
+            overlay.style.display = "flex";
+            overlay.innerHTML = `<h1>GAME OVER</h1><p>最終得分：${score}</p><button class="btn" onclick="location.reload()">再玩一次</button>`;
+        }
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    function spawnPowerUp(x, y) {
+        const types = ['L', 'S', 'M'];
+        powerUps.push({x, y, type: types[Math.floor(Math.random()*3)]});
+    }
+
+    function applyPowerUp(type) {
+        if (type === 'L') { paddle.w = 150; setTimeout(() => paddle.w = 75, 10000); }
+        else if (type === 'S') { paddle.hasGun = true; setTimeout(() => paddle.hasGun = false, 10000); }
+        else if (type === 'M') {
+            for(let i=0; i<3; i++) balls.push({x: paddle.x + paddle.w/2, y: paddle.y - 10, dx: Math.random()*6-3, dy: -4, radius: 7});
+        }
+    }
+
+    startBtn.addEventListener("click", startGame);
+</script>
+</body>
+</html>

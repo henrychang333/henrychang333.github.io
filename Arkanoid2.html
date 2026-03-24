@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Arkanoid - ZX Spectrum 原版關卡 (道具修正)</title>
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #1a1a1a; color: white; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        #gameContainer { position: relative; width: 90vw; height: 160vw; max-width: 480px; max-height: 850px; }
+        #gameCanvas { background: #000; display: block; width: 100%; height: 100%; border: 3px solid #444; border-radius: 8px; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; text-align: center; border-radius: 8px; padding: 20px; box-sizing: border-box; }
+        .btn { padding: 15px 40px; font-size: 22px; background: #0095DD; color: white; border: none; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,149,221,0.4); }
+        #scoreBoard, #levelBoard { position: absolute; width: 100%; text-align: center; font-size: 20px; pointer-events: none; }
+        #scoreBoard { top: 10px; } #levelBoard { top: 40px; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="scoreBoard">Score: 0</div>
+        <div id="levelBoard">Level: 1</div>
+        <div id="overlay">
+            <h1 style="color: #0095DD;">Arkanoid</h1>
+            <p style="line-height: 1.6;"></p>
+            <button class="btn" id="startBtn">開始</button>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('startBtn');
+        const scoreBoard = document.getElementById('scoreBoard');
+        const levelBoard = document.getElementById('levelBoard');
+
+        const GAMEW = 440, GAMEH = 780;
+        canvas.width = GAMEW; canvas.height = GAMEH;
+
+        let gameStarted = false, isGameOver = false, score = 0, currentLevel = 1;
+        const paddle = { w: 75, h: 12, x: GAMEW/2-37.5, y: GAMEH-50, color: '#0095DD', speed: 8, hasGun: false };
+        const keys = { left: false, right: false };
+        let balls = [], bricks = [], powerUps = [], bullets = [];
+
+        const BRICK_W = 35, BRICK_H = 12, BRICK_START_X = 35, BRICK_START_Y = 60;
+        const BALL_RADIUS = 7;
+
+        // 安全關卡生成函數 (同前版)
+        function createFullLevel() { return Array.from({length: 28}, () => [1,1,1,1,1,1,1,1,1,1,1]); }
+        function createTunnelLevel() { return Array.from({length: 28}, (_,r) => (r < 6 || r > 21) ? [1,1,1,1,1,1,1,1,1,1,1] : [1,0,0,0,0,0,0,0,0,0,1]); }
+        function createDiamondLevel() { return Array.from({length: 28}, (_,r) => { if (r < 4 || r > 23) return Array(11).fill(0); const size = Math.min(r-3, 24-r); const leftEmpty = Math.max(0, 5-size); const brickCount = Math.min(size*2+1, 11-leftEmpty*2); return Array(leftEmpty).fill(0).concat(Array(brickCount).fill(1)).concat(Array(11-leftEmpty-brickCount).fill(0)); }); }
+
+        const levelPatterns = [
+            createFullLevel(), createTunnelLevel(), createDiamondLevel(), createTunnelLevel(), createFullLevel(),
+            createTunnelLevel(), createFullLevel(), createDiamondLevel(), createTunnelLevel(), createFullLevel(),
+            ...Array.from({length: 10}, (_,i) => Array.from({length: 28}, (_,r) => Array.from({length: 11}, (_,c) => Math.random() < (0.5 + i*0.03) ? 1 : 0))),
+            ...Array.from({length: 10}, (_,i) => Array.from({length: 28}, (_,r) => Array.from({length: 11}, (_,c) => Math.random() < (0.65 + i*0.02) ? 1 : 0))),
+            Array.from({length: 28}, (_,r) => (r % 3 === 0) ? [1,0,1,0,1,0,1,0,1,0,1] : Array(11).fill(1)),
+            Array.from({length: 28}, (_,r) => { const pattern = r % 4; return pattern === 0 ? Array(11).fill(1) : pattern === 1 ? [0,1,0,1,0,1,0,1,0,1,0] : pattern === 2 ? [1,0,1,0,1,0,1,0,1,0,1] : Array(11).fill(0); }),
+            []
+        ];
+
+        function checkCircleRectCollision(ball, rect) {
+            const dx = ball.x - Math.max(rect.x, Math.min(ball.x, rect.x + rect.w));
+            const dy = ball.y - Math.max(rect.y, Math.min(ball.y, rect.y + rect.h));
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return { colliding: distance < BALL_RADIUS, overlapX: dx, overlapY: dy };
+        }
+
+        // 🔥 修正版道具碰撞檢測 - 擴大收集範圍
+        function checkPowerUpPaddleCollision(powerUp) {
+            // 擴大 paddle 收集範圍：左右各增加 30px，上下增加 10px
+            const expandedPaddle = {
+                x: paddle.x - 30,
+                y: paddle.y - 10,
+                w: paddle.w + 60,  // 左右各+30px
+                h: paddle.h + 20   // 上下各+10px
+            };
+            
+            // 檢查 powerUp 是否進入擴大範圍
+            return powerUp.x + 11 > expandedPaddle.x && 
+                   powerUp.x + 11 < expandedPaddle.x + expandedPaddle.w &&
+                   powerUp.y + 11 > expandedPaddle.y && 
+                   powerUp.y + 11 < expandedPaddle.y + expandedPaddle.h;
+        }
+
+        // 事件綁定 (同前)
+        window.addEventListener('keydown', e => { if(e.key==='ArrowLeft'||e.key==='Left') keys.left=true; if(e.key==='ArrowRight'||e.key==='Right') keys.right=true; if(e.code==='Space') shoot(); });
+        window.addEventListener('keyup', e => { if(e.key==='ArrowLeft'||e.key==='Left') keys.left=false; if(e.key==='ArrowRight'||e.key==='Right') keys.right=false; });
+        window.addEventListener('mousemove', e => { if(!gameStarted) return; const rect=canvas.getBoundingClientRect(); const scaleX=GAMEW/rect.width; paddle.x=(e.clientX-rect.left)*scaleX-paddle.w/2; });
+        window.addEventListener('touchmove', e => { if(!gameStarted) return; const rect=canvas.getBoundingClientRect(); const scaleX=GAMEW/rect.width; paddle.x=(e.touches[0].clientX-rect.left)*scaleX-paddle.w/2; e.preventDefault(); }, {passive:false});
+        window.addEventListener('touchstart', () => { if(gameStarted) shoot(); });
+        window.addEventListener('mousedown', () => { if(gameStarted) shoot(); });
+
+        function initBricks() {
+            bricks = [];
+            const pattern = levelPatterns[Math.min(currentLevel-1, levelPatterns.length-1)] || levelPatterns[0];
+            for(let r=0; r<Math.min(pattern.length, 28); r++) {
+                for(let c=0; c<Math.min(pattern[r]?.length || 0, 11); c++) {
+                    if(pattern[r][c]===1) {
+                        bricks.push({
+                            x: BRICK_START_X + c*BRICK_W,
+                            y: BRICK_START_Y + r*BRICK_H,
+                            w: BRICK_W-1, h: BRICK_H-1,
+                            status: 1,
+                            color: `hsl(${((r*10+c*5)%360)}, 70%, 50%)`
+                        });
+                    }
+                }
+            }
+        }
+
+        function checkLevelComplete() {
+            const activeBricks = bricks.filter(b => b.status===1);
+            if(activeBricks.length===0) {
+                if(currentLevel===33) {
+                    isGameOver = true;
+                    overlay.style.display = 'flex';
+                    overlay.innerHTML = `<h1 style="color: #0f0;">YOU WIN!</h1><p>恭喜通關33關！最終分數: ${score}</p><button class="btn" onclick="location.reload()">重新開始</button>`;
+                    return;
+                }
+                currentLevel++; score += 1000*currentLevel;
+                scoreBoard.innerText = `Score: ${score}`; levelBoard.innerText = `Level: ${currentLevel}`;
+                balls = [{x:GAMEW/2, y:GAMEH-70, dx:3.5, dy:-3.5, radius:BALL_RADIUS}];
+                paddle.w=75; paddle.hasGun=false; powerUps=[]; bullets=[];
+                initBricks();
+            }
+        }
+
+        function shoot() { if(paddle.hasGun) { bullets.push({x:paddle.x+5,y:paddle.y,w:4,h:10}); bullets.push({x:paddle.x+paddle.w-9,y:paddle.y,w:4,h:10}); } }
+
+        function spawnPowerUp(x,y) { const types=['L','S','M']; powerUps.push({x,y,type:types[Math.floor(Math.random()*3)]}); }
+
+        function applyPowerUp(type) {
+            if(type==='L') { paddle.w=120; setTimeout(()=>paddle.w=75,10000); }
+            else if(type==='S') { paddle.hasGun=true; setTimeout(()=>paddle.hasGun=false,10000); }
+            else if(type==='M') for(let i=0;i<3;i++) balls.push({x:paddle.x+paddle.w/2,y:paddle.y-10,dx:Math.random()*6-3,dy:-4,radius:BALL_RADIUS});
+        }
+
+        function startGame() {
+            overlay.style.display='none'; gameStarted=true; isGameOver=false; score=0; currentLevel=1;
+            scoreBoard.innerText=`Score: ${score}`; levelBoard.innerText=`Level: ${currentLevel}`;
+            paddle.w=75; paddle.hasGun=false; balls=[{x:GAMEW/2,y:GAMEH-70,dx:3.5,dy:-3.5,radius:BALL_RADIUS}]; initBricks(); gameLoop();
+        }
+
+        function gameLoop() {
+            if(!gameStarted || isGameOver) return;
+            ctx.clearRect(0,0,GAMEW,GAMEH);
+
+            // Paddle 移動與繪製
+            if(keys.left) paddle.x-=paddle.speed; if(keys.right) paddle.x+=paddle.speed;
+            if(paddle.x<0) paddle.x=0; if(paddle.x>GAMEW-paddle.w) paddle.x=GAMEW-paddle.w;
+            ctx.fillStyle=paddle.color; ctx.fillRect(paddle.x,paddle.y,paddle.w,paddle.h);
+            if(paddle.hasGun) { ctx.fillStyle='#FF4500'; ctx.fillRect(paddle.x,paddle.y-6,6,6); ctx.fillRect(paddle.x+paddle.w-6,paddle.y-6,6,6); }
+
+            // Bricks 繪製
+            bricks.forEach(b => { 
+                if(b.status===1) { 
+                    ctx.fillStyle=b.color; ctx.fillRect(b.x,b.y,b.w,b.h); 
+                    ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=0.5;
+                    ctx.strokeRect(b.x,b.y,b.w,b.h); 
+                } 
+            });
+
+            // Balls (同前版)
+            for(let bIdx=balls.length-1; bIdx>=0; bIdx--) {
+                const ball = balls[bIdx];
+                ball.x += ball.dx; ball.y += ball.dy;
+
+                if(ball.x - BALL_RADIUS < 0 || ball.x + BALL_RADIUS > GAMEW) ball.dx *= -1;
+                if(ball.y - BALL_RADIUS < 0) ball.dy *= -1;
+
+                const paddleRect = {x: paddle.x, y: paddle.y, w: paddle.w, h: paddle.h};
+                const paddleCollision = checkCircleRectCollision(ball, paddleRect);
+                if(paddleCollision.colliding && ball.y < paddle.y + BALL_RADIUS) {
+                    const hitPos = (ball.x - paddle.x) / paddle.w;
+                    ball.dy = -Math.abs(ball.dy);
+                    ball.dx = (hitPos - 0.5) * 8;
+                    ball.y = paddle.y - BALL_RADIUS;
+                }
+
+                for(let brIdx=bricks.length-1; brIdx>=0; brIdx--) {
+                    const brick = bricks[brIdx];
+                    if(brick.status === 1) {
+                        const brickCollision = checkCircleRectCollision(ball, brick);
+                        if(brickCollision.colliding) {
+                            brick.status = 0; score += 10; scoreBoard.innerText = `Score: ${score}`;
+                            if(Math.abs(brickCollision.overlapX) > Math.abs(brickCollision.overlapY)) {
+                                ball.dx *= -1;
+                            } else {
+                                ball.dy *= -1;
+                            }
+                            if(Math.random() < 0.2) spawnPowerUp(brick.x + brick.w/2, brick.y);
+                            break;
+                        }
+                    }
+                }
+
+                if(ball.y + BALL_RADIUS > GAMEH) balls.splice(bIdx, 1);
+                ctx.beginPath(); ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI*2); ctx.fillStyle='#FFF'; ctx.fill();
+            }
+
+            // 🔥 修正版 PowerUps - 擴大收集範圍
+            for(let i=powerUps.length-1; i>=0; i--) {
+                const p = powerUps[i];
+                p.y += 2.5;
+
+                // 繪製
+                ctx.fillStyle = p.type==='L' ? '#0f0' : p.type==='S' ? '#f44' : '#0ff'; 
+                ctx.fillRect(p.x, p.y, 22, 22);
+                ctx.fillStyle='#000'; ctx.font='bold 14px Arial'; ctx.fillText(p.type, p.x+6, p.y+17);
+
+                // ✅ 新增：使用擴大範圍碰撞檢測
+                if(checkPowerUpPaddleCollision(p)) {
+                    applyPowerUp(p.type);
+                    powerUps.splice(i, 1);
+                }
+                if(p.y > GAMEH) powerUps.splice(i, 1);
+            }
+
+            // Bullets (同前)
+            for(let i=bullets.length-1; i>=0; i--) {
+                const bu = bullets[i];
+                bu.y -= 7; ctx.fillStyle='#FF4500'; ctx.fillRect(bu.x, bu.y, bu.w, bu.h);
+                for(let brIdx=bricks.length-1; brIdx>=0; brIdx--) {
+                    const br = bricks[brIdx];
+                    if(br.status===1 && bu.x>br.x && bu.x<br.x+br.w && bu.y>br.y && bu.y<br.y+br.h) {
+                        br.status=0; bullets.splice(i,1); score+=10; scoreBoard.innerText=`Score: ${score}`; break;
+                    }
+                }
+                if(bu.y<0) bullets.splice(i,1);
+            }
+
+            checkLevelComplete();
+            if(balls.length===0 && currentLevel!==33) {
+                isGameOver=true; overlay.style.display='flex';
+                overlay.innerHTML=`<h1>GAME OVER</h1><p>最終分數: ${score}</p><button class="btn" onclick="location.reload()">重新開始</button>`;
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        startBtn.addEventListener('click', startGame);
+    </script>
+</body>
+</html>

@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>塔防守衛 · TOWER DEFENSE</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg:#0a0c10; --panel:#0f1318; --border:#1e2a3a;
+  --accent:#00d4ff; --accent3:#7fff00; --accent4:#ff3366;
+  --gold:#ffd700; --text:#c8d8e8; --dim:#4a5a6a;
+}
+
+*{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html,body{
+  background:var(--bg); color:var(--text);
+  font-family:'Share Tech Mono',monospace;
+  width:100%; height:100%; overflow:hidden;
+}
+
+/* ═══════════════════════════════
+   DESKTOP layout  (default)
+   [canvas] | [sidebar 200px]
+   ═══════════════════════════════ */
+#app{
+  display:flex; flex-direction:column;
+  width:100vw; height:100vh;
+}
+
+/* top HUD bar */
+#hud-bar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:6px 14px; gap:8px;
+  background:var(--panel); border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.title{
+  font-family:'Orbitron',sans-serif; font-weight:900;
+  font-size:clamp(11px,2vw,16px); color:var(--accent);
+  letter-spacing:2px; text-shadow:0 0 14px rgba(0,212,255,.5);
+  white-space:nowrap;
+}
+.hud{display:flex; gap:clamp(8px,2vw,20px); align-items:center;}
+.hud-item{text-align:center;}
+.hud-label{color:var(--dim); font-size:clamp(7px,1vw,9px); letter-spacing:1px;}
+.hud-val{font-family:'Orbitron',sans-serif; font-size:clamp(12px,2vw,15px); font-weight:700;}
+.hud-val.gold{color:var(--gold);}
+.hud-val.red{color:var(--accent4);}
+.hud-val.green{color:var(--accent3);}
+.hud-val.blue{color:var(--accent);}
+
+/* main row: canvas + sidebar */
+#main-row{
+  display:flex; flex:1; overflow:hidden;
+}
+
+#canvas-area{
+  flex:1; overflow:hidden; position:relative;
+}
+#gameCanvas{display:block; touch-action:none; cursor:crosshair;}
+
+/* ── Desktop sidebar ── */
+#sidebar{
+  width:200px; flex-shrink:0;
+  background:var(--panel); border-left:1px solid var(--border);
+  display:flex; flex-direction:column; overflow-y:auto;
+}
+.sb-title{
+  font-family:'Orbitron',sans-serif; font-size:9px; letter-spacing:2px;
+  color:var(--dim); padding:8px 12px 6px; border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.tw-btn{
+  padding:9px 12px; border:none; background:transparent; color:var(--text);
+  cursor:pointer; text-align:left; border-bottom:1px solid var(--border);
+  font-family:'Share Tech Mono',monospace; font-size:11px; width:100%;
+  transition:background .12s;
+}
+.tw-btn:hover{background:rgba(255,255,255,.04);}
+.tw-btn.selected{background:rgba(0,212,255,.1); border-left:2px solid var(--accent);}
+.tw-btn.cant-afford{opacity:.4;}
+.tw-icon{font-size:18px; float:right;}
+.tw-name{font-family:'Orbitron',sans-serif; font-size:10px; font-weight:700; margin-bottom:2px;}
+.tw-desc{color:var(--dim); font-size:9px; line-height:1.35;}
+.tw-cost{color:var(--gold); font-size:9px; margin-top:3px;}
+
+.sb-wave-btn{
+  margin:8px 12px 4px; padding:10px; width:calc(100% - 24px);
+  background:linear-gradient(135deg,rgba(0,212,255,.18),rgba(0,212,255,.04));
+  border:1px solid var(--accent); color:var(--accent);
+  font-family:'Orbitron',sans-serif; font-size:10px; letter-spacing:1px;
+  cursor:pointer; text-align:center; flex-shrink:0;
+}
+.sb-wave-btn:hover{background:rgba(0,212,255,.28);}
+.sb-wave-btn:disabled{opacity:.4; cursor:not-allowed;}
+
+.sb-sell-btn{
+  margin:0 12px 8px; padding:8px; width:calc(100% - 24px);
+  background:rgba(255,51,102,.08); border:1px solid var(--accent4);
+  color:var(--accent4); font-family:'Orbitron',sans-serif;
+  font-size:9px; letter-spacing:1px; cursor:pointer; text-align:center; flex-shrink:0;
+}
+.sb-sell-btn.selected{background:rgba(255,51,102,.25);}
+.sb-sell-btn:hover{background:rgba(255,51,102,.18);}
+
+#towerInfo{padding:8px 12px; font-size:10px; border-top:1px solid var(--border);}
+#towerInfo .it{font-family:'Orbitron',sans-serif; font-size:8px; color:var(--dim); letter-spacing:2px; margin-bottom:5px;}
+.ir{display:flex; justify-content:space-between; margin-bottom:3px;}
+.ik{color:var(--dim);}
+.iv{color:var(--accent);}
+
+/* ═══════════════════════════════
+   MOBILE layout  (<= 600px)
+   [hud-bar]
+   [canvas fills rest]
+   [mob-bar fixed at bottom]
+   ═══════════════════════════════ */
+#mob-bar{
+  display:none;                       /* hidden on desktop */
+  position:fixed; bottom:0; left:0; right:0;
+  background:var(--panel); border-top:2px solid var(--border);
+  z-index:100;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  flex-direction:column;
+}
+#mob-scroll{
+  display:flex; overflow-x:auto;
+  -webkit-overflow-scrolling:touch; scrollbar-width:none;
+}
+#mob-scroll::-webkit-scrollbar{display:none;}
+.mb-btn{
+  flex-shrink:0; width:72px; min-height:68px;
+  padding:6px 2px 5px; border:none; border-right:1px solid var(--border);
+  background:transparent; color:var(--text);
+  cursor:pointer; text-align:center;
+  font-family:'Share Tech Mono',monospace;
+  touch-action:manipulation; -webkit-appearance:none;
+}
+.mb-btn.selected{background:rgba(0,212,255,.15); border-top:2px solid var(--accent);}
+.mb-btn.cant-afford{opacity:.35;}
+.mb-btn:active{background:rgba(255,255,255,.08);}
+.mb-icon{font-size:22px; display:block; line-height:1.1;}
+.mb-name{font-family:'Orbitron',sans-serif; font-size:7.5px; font-weight:700; margin:2px 0 1px;}
+.mb-cost{color:var(--gold); font-size:8px;}
+
+#mob-actions{
+  display:flex; gap:6px; padding:5px 8px; flex-shrink:0;
+}
+.ma-wave{
+  flex:1; padding:9px 4px;
+  background:linear-gradient(135deg,rgba(0,212,255,.18),rgba(0,212,255,.04));
+  border:1px solid var(--accent); color:var(--accent);
+  font-family:'Orbitron',sans-serif; font-size:10px; letter-spacing:1px;
+  cursor:pointer; text-align:center; touch-action:manipulation; -webkit-appearance:none;
+}
+.ma-wave:disabled{opacity:.4;}
+.ma-wave:active{background:rgba(0,212,255,.32);}
+.ma-sell{
+  padding:9px 12px;
+  background:rgba(255,51,102,.08); border:1px solid var(--accent4);
+  color:var(--accent4); font-family:'Orbitron',sans-serif;
+  font-size:10px; cursor:pointer; white-space:nowrap;
+  touch-action:manipulation; -webkit-appearance:none;
+}
+.ma-sell.selected{background:rgba(255,51,102,.28);}
+.ma-sell:active{background:rgba(255,51,102,.28);}
+
+/* ── Overlays ── */
+.overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.88);
+  display:flex; align-items:center; justify-content:center;
+  z-index:300; font-family:'Orbitron',sans-serif;
+  padding:20px; touch-action:auto;
+}
+.overlay-box{
+  border:1px solid var(--accent); background:var(--panel);
+  padding:clamp(20px,5vw,40px) clamp(20px,6vw,48px);
+  text-align:center; width:100%; max-width:380px;
+  box-shadow:0 0 50px rgba(0,212,255,.2); touch-action:auto;
+}
+.ov-title{font-size:clamp(18px,5vw,26px); font-weight:900; letter-spacing:3px; margin-bottom:8px;}
+.ov-sub{color:var(--dim); font-size:clamp(9px,2.5vw,11px); letter-spacing:1px; margin-bottom:14px;}
+.ov-score{font-size:clamp(13px,3.5vw,18px); color:var(--gold); margin-bottom:20px;}
+.ov-hint{color:var(--dim); font-size:clamp(9px,2vw,11px); line-height:1.9; margin-bottom:18px; font-family:'Share Tech Mono',monospace;}
+.ov-btn{
+  display:inline-block; padding:13px 28px;
+  background:linear-gradient(135deg,rgba(0,212,255,.2),rgba(0,212,255,.04));
+  border:1px solid var(--accent); color:var(--accent);
+  font-family:'Orbitron',sans-serif; font-size:clamp(11px,2.5vw,13px);
+  letter-spacing:2px; cursor:pointer; margin:0 4px;
+  min-width:130px; min-height:46px;
+  touch-action:manipulation; -webkit-appearance:none;
+}
+.ov-btn:hover{background:rgba(0,212,255,.3);}
+.ov-btn:active{background:rgba(0,212,255,.4);}
+
+/* messages */
+#msgLog{position:fixed; bottom:10px; left:10px; font-size:11px; pointer-events:none; z-index:200;}
+.msg{animation:fm 2.5s forwards; text-shadow:0 1px 4px rgba(0,0,0,.9); margin-bottom:2px;}
+@keyframes fm{0%{opacity:1;transform:translateY(0)}70%{opacity:1}100%{opacity:0;transform:translateY(-16px)}}
+
+/* scrollbars */
+#mob-tower-info {
+  border-top: 1px solid var(--border);
+  padding: 6px 10px;
+  background: rgba(0,212,255,.04);
+}
+#mob-info-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.mob-info-stat {
+  font-size: 10px;
+  color: var(--dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mob-info-stat span { color: var(--accent); }
+.mob-info-stat.lv span { color: var(--gold); }
+.mob-upg-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 6px 10px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-appearance: none;
+  border: 1px solid var(--gold);
+  background: rgba(255,215,0,.12);
+  color: var(--gold);
+  min-height: 36px;
+}
+.mob-upg-btn:active { background: rgba(255,215,0,.3); }
+.mob-upg-btn.cant-afford { opacity: .4; border-color: #555; color: #555; background: rgba(80,80,80,.1); cursor:not-allowed; }
+::-webkit-scrollbar{width:3px; height:3px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);}
+
+/* ── Mobile breakpoint ── */
+@media(max-width:600px){
+  #sidebar{display:none !important;}
+  #mob-bar{display:flex !important;}
+  /* leave room for fixed mob-bar (~90px) */
+  #canvas-area{padding-bottom:90px;}
+}
+@media(max-height:460px) and (orientation:landscape){
+  #sidebar{width:155px;}
+  .tw-desc{display:none;}
+  .tw-btn{padding:5px 8px;}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- HUD bar -->
+  <div id="hud-bar">
+    <div class="title">◈ TOWER DEFENSE</div>
+    <div class="hud">
+      <div class="hud-item"><div class="hud-label">POINTS</div><div class="hud-val gold" id="h-pts">100</div></div>
+      <div class="hud-item"><div class="hud-label">LIVES</div><div class="hud-val red" id="h-lives">20</div></div>
+      <div class="hud-item"><div class="hud-label">WAVE</div><div class="hud-val blue" id="h-wave">0</div></div>
+      <div class="hud-item"><div class="hud-label">SCORE</div><div class="hud-val green" id="h-score">0</div></div>
+    </div>
+  </div>
+
+  <!-- Main row -->
+  <div id="main-row">
+    <!-- Canvas -->
+    <div id="canvas-area">
+      <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- Desktop sidebar -->
+    <div id="sidebar">
+      <div class="sb-title">— 武器選擇 —</div>
+
+      <button class="tw-btn" data-type="arrow" onclick="selectTower('arrow')">
+        <span class="tw-icon">🏹</span>
+        <div class="tw-name" style="color:#7fff00">弓箭塔</div>
+        <div class="tw-desc">單體·速度快·傷害低</div>
+        <div class="tw-cost">💰 50 點</div>
+      </button>
+      <button class="tw-btn" data-type="cannon" onclick="selectTower('cannon')">
+        <span class="tw-icon">💣</span>
+        <div class="tw-name" style="color:#ff6b35">砲彈塔</div>
+        <div class="tw-desc">範圍爆炸·傷害高</div>
+        <div class="tw-cost">💰 120 點</div>
+      </button>
+      <button class="tw-btn" data-type="laser" onclick="selectTower('laser')">
+        <span class="tw-icon">⚡</span>
+        <div class="tw-name" style="color:#00d4ff">雷射塔</div>
+        <div class="tw-desc">連續光束·穿透敵人</div>
+        <div class="tw-cost">💰 180 點</div>
+      </button>
+      <button class="tw-btn" data-type="freeze" onclick="selectTower('freeze')">
+        <span class="tw-icon">❄️</span>
+        <div class="tw-name" style="color:#88ccff">冰凍塔</div>
+        <div class="tw-desc">範圍減速·輔助用</div>
+        <div class="tw-cost">💰 100 點</div>
+      </button>
+      <button class="tw-btn" data-type="missile" onclick="selectTower('missile')">
+        <span class="tw-icon">🚀</span>
+        <div class="tw-name" style="color:#ffd700">飛彈塔</div>
+        <div class="tw-desc">追蹤最強·超高傷害</div>
+        <div class="tw-cost">💰 250 點</div>
+      </button>
+      <button class="tw-btn" data-type="poison" onclick="selectTower('poison')">
+        <span class="tw-icon">☠️</span>
+        <div class="tw-name" style="color:#99ff44">毒氣塔</div>
+        <div class="tw-desc">持續中毒·大範圍</div>
+        <div class="tw-cost">💰 200 點</div>
+      </button>
+
+      <button class="sb-wave-btn" id="sbWaveBtn" onclick="startWave()">▶ 開始第 1 波</button>
+      <button class="sb-sell-btn" id="sbSellBtn" onclick="sellMode()" style="display:none">↩ 出售塔 (50%)</button>
+
+      <div id="towerInfo" style="display:none">
+        <div class="it">— 塔資訊 —</div>
+        <div id="infoContent"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile bar (fixed bottom) -->
+<div id="mob-bar">
+  <div id="mob-scroll">
+    <button class="mb-btn" data-type="arrow" onclick="selectTower('arrow')">
+      <span class="mb-icon">🏹</span><div class="mb-name" style="color:#7fff00">弓箭塔</div><div class="mb-cost">50pt</div>
+    </button>
+    <button class="mb-btn" data-type="cannon" onclick="selectTower('cannon')">
+      <span class="mb-icon">💣</span><div class="mb-name" style="color:#ff6b35">砲彈塔</div><div class="mb-cost">120pt</div>
+    </button>
+    <button class="mb-btn" data-type="laser" onclick="selectTower('laser')">
+      <span class="mb-icon">⚡</span><div class="mb-name" style="color:#00d4ff">雷射塔</div><div class="mb-cost">180pt</div>
+    </button>
+    <button class="mb-btn" data-type="freeze" onclick="selectTower('freeze')">
+      <span class="mb-icon">❄️</span><div class="mb-name" style="color:#88ccff">冰凍塔</div><div class="mb-cost">100pt</div>
+    </button>
+    <button class="mb-btn" data-type="missile" onclick="selectTower('missile')">
+      <span class="mb-icon">🚀</span><div class="mb-name" style="color:#ffd700">飛彈塔</div><div class="mb-cost">250pt</div>
+    </button>
+    <button class="mb-btn" data-type="poison" onclick="selectTower('poison')">
+      <span class="mb-icon">☠️</span><div class="mb-name" style="color:#99ff44">毒氣塔</div><div class="mb-cost">200pt</div>
+    </button>
+  </div>
+  <!-- Mobile tower info panel (shown when tower is tapped) -->
+  <div id="mob-tower-info" style="display:none">
+    <div id="mob-info-content"></div>
+  </div>
+  <div id="mob-actions">
+    <button class="ma-wave" id="mobWaveBtn" onclick="startWave()">▶ 開始第 1 波</button>
+    <button class="ma-sell" id="mobSellBtn" onclick="sellMode()" style="display:none">↩ 出售</button>
+  </div>
+</div>
+
+<!-- Overlays -->
+<div class="overlay" id="startOverlay">
+  <div class="overlay-box">
+    <div class="ov-title" style="color:#00d4ff">TOWER DEFENSE</div>
+    <div class="ov-sub">塔防守衛 · 無盡模式</div>
+    <div class="ov-hint">
+      選擇武器 → 點擊地圖放置<br>
+      消滅敵人獲得點數購買更多塔<br>
+      每波敵人數量 +30%、生命 +10%<br>
+      守住20條生命，堅持越久分越高！
+    </div>
+    <button class="ov-btn" onclick="startGame()">▶ 開始遊戲</button>
+  </div>
+</div>
+
+<div class="overlay" id="endOverlay" style="display:none">
+  <div class="overlay-box">
+    <div class="ov-title" id="endTitle" style="color:#ff3366">GAME OVER</div>
+    <div class="ov-sub" id="endSub"></div>
+    <div class="ov-score" id="endScore"></div>
+    <button class="ov-btn" onclick="restartGame()">↺ 重新開始</button>
+  </div>
+</div>
+
+<div id="msgLog"></div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx    = canvas.getContext('2d');
+
+// ── Resize ──────────────────────────────────────────────
+function resize(){
+  const area = document.getElementById('canvas-area');
+  canvas.width  = area.clientWidth;
+  canvas.height = area.clientHeight;
+  buildPath();
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', ()=>setTimeout(resize,250));
+
+// ── State ───────────────────────────────────────────────
+let pts=200,lives=20,score=0,wave=0;
+let towers=[],enemies=[],projectiles=[],particles=[];
+let selectedType=null,selectedTower=null;
+let waveRunning=false,gameOver=false,gameStarted=false;
+let isSellMode=false;
+let mouseX=0,mouseY=0,showGhost=false;
+let path=[],spawnQueue=[],lastTime=0;
+
+const TOWER_DEFS={
+  arrow:  {name:'弓箭塔',cost:50, dmg:13, rate:0.8,range:120,color:'#7fff00',splash:0,  slow:0,  dot:0},
+  cannon: {name:'砲彈塔',cost:120,dmg:40, rate:0.3,range:140,color:'#ff6b35',splash:60, slow:0,  dot:0},
+  laser:  {name:'雷射塔',cost:180,dmg:9,  rate:3.0,range:160,color:'#00d4ff',splash:0,  slow:0,  dot:0,pierce:true},
+  freeze: {name:'冰凍塔',cost:100,dmg:4,  rate:0.6,range:130,color:'#88ccff',splash:80, slow:0.5,dot:0},
+  missile:{name:'飛彈塔',cost:250,dmg:90, rate:0.2,range:200,color:'#ffd700',splash:30, slow:0,  dot:0},
+  poison: {name:'毒氣塔',cost:200,dmg:4,  rate:0.5,range:150,color:'#99ff44',splash:100,slow:0,  dot:4},
+};
+
+const ENEMY_DEFS=[
+  {name:'小兵', hp:30,  spd:0.50,reward:10, color:'#ff4444',r:8 },
+  {name:'精英', hp:90,  spd:0.35,reward:25, color:'#ff8800',r:11},
+  {name:'坦克', hp:250, spd:0.22,reward:60, color:'#cc0000',r:14},
+  {name:'快攻', hp:35,  spd:0.85,reward:20, color:'#ff66cc',r:7 },
+  {name:'首領', hp:800, spd:0.18,reward:200,color:'#990000',r:18},
+];
+
+// ── Path ───────────────────────────────────────────────
+function buildPath(){
+  const W=canvas.width,H=canvas.height;
+  if(W<10||H<10)return;
+  path=[];
+  const wp=[
+    {x:0,     y:H*.22},{x:W*.25,y:H*.22},
+    {x:W*.25, y:H*.62},{x:W*.62,y:H*.62},
+    {x:W*.62, y:H*.18},{x:W*.85,y:H*.18},
+    {x:W*.85, y:H*.78},{x:W+10, y:H*.78},
+  ];
+  for(let i=0;i<wp.length-1;i++){
+    const a=wp[i],b=wp[i+1];
+    const n=Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/4);
+    for(let t=0;t<=n;t++) path.push({x:a.x+(b.x-a.x)*t/n,y:a.y+(b.y-a.y)*t/n});
+  }
+}
+function onPath(x,y,m=26){for(const p of path)if(Math.hypot(p.x-x,p.y-y)<m)return true;return false;}
+
+// cost of next upgrade: base = cost/4, each level multiplied by 1.5
+function upgradeCost(t){
+  return Math.floor(t.def.cost / 4 * Math.pow(1.5, t.level - 1));
+}
+
+// ── Tower actions ──────────────────────────────────────
+function selectTower(type){
+  isSellMode=false;
+  selectedType=(selectedType===type)?null:type;
+  selectedTower=null;
+  document.getElementById('towerInfo').style.display='none';
+  updateUI();
+  if(selectedType) msg(`選擇 ${TOWER_DEFS[type].name} (${TOWER_DEFS[type].cost}點)`,TOWER_DEFS[type].color);
+}
+
+function sellMode(){
+  isSellMode=!isSellMode;
+  if(isSellMode){selectedType=null; msg('點擊塔來出售 (回收50%)','#ff3366');}
+  updateUI();
+}
+
+function placeTower(x,y){
+  if(!selectedType)return;
+  const def=TOWER_DEFS[selectedType];
+  if(pts<def.cost){msg('點數不足！','#ff3366');return;}
+  if(onPath(x,y)){msg('不能放在路徑上！','#ff6b35');return;}
+  for(const t of towers)if(Math.hypot(t.x-x,t.y-y)<30){msg('此處已有塔！','#ff6b35');return;}
+  pts-=def.cost;
+  towers.push({x,y,type:selectedType,def,timer:0,angle:0,
+    level:1, dmg:def.dmg, rate:def.rate});
+  updateHUD(); msg(`放置 ${def.name}！`,def.color);
+}
+
+function upgradeTower(t){
+  const cost=upgradeCost(t);
+  if(pts<cost){msg('點數不足升級！','#ff3366');return;}
+  pts-=cost;
+  t.level+=1;
+  t.dmg  = t.def.dmg  * Math.pow(1.3, t.level-1);
+  t.rate = t.def.rate * Math.pow(1.2, t.level-1);
+  updateHUD();
+  msg(`${t.def.name} 升至 Lv${t.level}！`,t.def.color);
+  showTowerInfo(t); // refresh panel
+}
+
+// ── Wave ───────────────────────────────────────────────
+function startWave(){
+  if(waveRunning||gameOver||!gameStarted)return;
+  wave++; updateHUD(); buildWave(); waveRunning=true;
+  setWaveBtns(true);
+  ['sbSellBtn','mobSellBtn'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='';});
+}
+
+function buildWave(){
+  spawnQueue=[];
+  const count=Math.floor(16*Math.pow(1.3,wave-1));  // doubled base (8→16)
+  const boss=wave%5===0;
+  for(let i=0;i<count;i++){
+    let ti;
+    if(boss&&i===count-1) ti=4;
+    else if(wave>=6) ti=Math.floor(Math.random()*4);
+    else if(wave>=3) ti=Math.floor(Math.random()*3);
+    else ti=Math.random()<.7?0:1;
+    const d=ENEMY_DEFS[ti];
+    // randomise HP ±30% and speed ±25% per individual enemy
+    const hpScale = Math.pow(1.1,wave-1) * (0.7+Math.random()*0.6);
+    const spdScale = (1+wave*.008) * (0.75+Math.random()*0.5);
+    const hp=Math.max(1,Math.floor(d.hp*hpScale));
+    spawnQueue.push({...d,hp,maxHp:hp,
+      spd:d.spd*spdScale,pathIdx:0,progress:0,
+      x:path[0].x,y:path[0].y,
+      slowTimer:0,dotTimer:0,dotDmg:0,delay:i*14});  // 55→14 (≈1/4)
+  }
+}
+
+function setWaveBtns(running){
+  const txt=running?'波次進行中...':`▶ 開始第 ${wave+1} 波`;
+  ['sbWaveBtn','mobWaveBtn'].forEach(id=>{
+    const e=document.getElementById(id);
+    if(e){e.textContent=txt;e.disabled=running;}
+  });
+}
+
+// ── Game loop ──────────────────────────────────────────
+function loop(ts){
+  const dt=Math.min((ts-lastTime)/1000,.05); lastTime=ts;
+  update(dt); draw();
+  requestAnimationFrame(loop);
+}
+
+function update(dt){
+  if(gameOver)return;
+
+  if(waveRunning&&spawnQueue.length){
+    spawnQueue[0].delay--;
+    if(spawnQueue[0].delay<=0) enemies.push(spawnQueue.shift());
+  }
+
+  for(let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];
+    e.progress+=e.spd*(e.slowTimer>0?.4:1)*(60*dt);
+    if(e.slowTimer>0)e.slowTimer-=dt;
+    if(e.dotTimer>0){e.hp-=e.dotDmg*dt;e.dotTimer-=dt;}
+    while(e.progress>=1&&e.pathIdx<path.length-1){
+      e.progress-=1;e.pathIdx++;
+      e.x=path[e.pathIdx].x;e.y=path[e.pathIdx].y;
+    }
+    if(e.hp<=0){score+=e.reward;pts+=e.reward;pfx(e.x,e.y,e.color,8);enemies.splice(i,1);updateHUD();continue;}
+    if(e.pathIdx>=path.length-1){
+      lives--;updateHUD();pfx(e.x,e.y,'#ff3366',12);enemies.splice(i,1);
+      if(lives<=0){endGame();return;}
+      continue;
+    }
+  }
+
+  for(const t of towers){
+    t.timer+=dt;
+    if(t.timer>=1/t.rate){const tg=findTarget(t);if(tg){shoot(t,tg);t.timer=0;}}
+  }
+
+  for(let i=projectiles.length-1;i>=0;i--){
+    const p=projectiles[i]; p.life-=dt;
+    if(p.life<=0){projectiles.splice(i,1);continue;}
+    if(p.type==='laser'){laserHit(p,dt);continue;}
+    if(p.tracking&&p.target&&p.target.hp>0){p.tx=p.target.x;p.ty=p.target.y;}
+    // missile always tracks; arrow/cannon aim at last known position
+    const dx=p.tx-p.x,dy=p.ty-p.y,d=Math.hypot(dx,dy);
+    if(d<p.spd*dt*60+4){explode(p);projectiles.splice(i,1);}
+    else{p.x+=dx/d*p.spd*dt*60;p.y+=dy/d*p.spd*dt*60;}
+  }
+
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.1;p.life-=dt;
+    if(p.life<=0)particles.splice(i,1);
+  }
+
+  if(waveRunning&&spawnQueue.length===0&&enemies.length===0){
+    waveRunning=false;
+    const bonus=wave*20;pts+=bonus;score+=bonus;updateHUD();
+    msg(`波次 ${wave} 完成！獎勵 ${bonus} 點`,'#ffd700');
+    setWaveBtns(false);
+  }
+}
+
+function findTarget(t){
+  let best=null,bp=-1,bh=-1;
+  for(const e of enemies){
+    if(Math.hypot(e.x-t.x,e.y-t.y)>t.def.range)continue;
+    if(t.type==='missile'){if(e.hp>bh){bh=e.hp;best=e;}}
+    else{const pg=e.pathIdx+e.progress;if(pg>bp){bp=pg;best=e;}}
+  }
+  return best;
+}
+
+function shoot(t,tg){
+  t.angle=Math.atan2(tg.y-t.y,tg.x-t.x);
+  const d=t.def;
+  if(t.type==='laser'){
+    projectiles.push({type:'laser',x:t.x,y:t.y,target:tg,dmg:t.dmg,color:d.color,life:1/t.rate*.9,pierce:d.pierce});
+  } else {
+    projectiles.push({type:t.type,x:t.x,y:t.y,tx:tg.x,ty:tg.y,
+      target:tg, tracking:t.type==='missile',
+      spd:8,dmg:t.dmg,color:d.color,splash:d.splash,slow:d.slow,dot:d.dot,life:4,
+      r:t.type==='cannon'?5:t.type==='missile'?6:3});
+  }
+}
+
+function explode(p){
+  if(p.splash>0){
+    for(const e of enemies){
+      if(Math.hypot(e.x-p.tx,e.y-p.ty)<p.splash){
+        e.hp-=p.dmg;
+        if(p.slow>0)e.slowTimer=2;
+        if(p.dot>0){e.dotTimer=4;e.dotDmg=p.dot;}
+      }
+    }
+    pfx(p.tx,p.ty,p.color,6);
+  } else {
+    // hit the closest enemy at impact point
+    let best=null,bd=999;
+    for(const e of enemies){
+      const d=Math.hypot(e.x-p.tx,e.y-p.ty);
+      if(d<bd){bd=d;best=e;}
+    }
+    if(best&&bd<best.r+12){
+      best.hp-=p.dmg;
+      pfx(p.tx,p.ty,p.color,3);
+    }
+  }
+}
+
+function laserHit(p,dt){
+  const tx=p.target?p.target.x:p.x+200,ty=p.target?p.target.y:p.y;
+  for(const e of enemies){
+    const lx=tx-p.x,ly=ty-p.y,len=Math.hypot(lx,ly);
+    if(len<1)continue;
+    const t2=((e.x-p.x)*lx+(e.y-p.y)*ly)/(len*len);
+    if(t2<0||t2>1)continue;
+    if(Math.hypot(p.x+t2*lx-e.x,p.y+t2*ly-e.y)<12){
+      e.hp-=p.dmg*dt*60;if(!p.pierce)break;
+    }
+  }
+}
+
+function pfx(x,y,color,n){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2,s=1+Math.random()*2;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,color,life:.4+Math.random()*.4,r:2+Math.random()*2});
+  }
+}
+
+// ── Draw ───────────────────────────────────────────────
+function draw(){
+  const W=canvas.width,H=canvas.height;
+  ctx.fillStyle='#080b0f';ctx.fillRect(0,0,W,H);
+
+  // grid
+  ctx.strokeStyle='rgba(30,42,58,.4)';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  if(!path.length)return;
+
+  // path
+  const dp=(w,s)=>{
+    ctx.strokeStyle=s;ctx.lineWidth=w;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();ctx.moveTo(path[0].x,path[0].y);
+    for(const p of path)ctx.lineTo(p.x,p.y);ctx.stroke();
+  };
+  ctx.save();
+  dp(55,'rgba(255,107,53,.06)');dp(36,'rgba(255,107,53,.13)');dp(24,'rgba(50,35,15,.85)');
+  ctx.restore();
+
+  // path arrows
+  for(let i=20;i<path.length-20;i+=60){
+    if(i+1>=path.length)break;
+    const a=Math.atan2(path[i+1].y-path[i].y,path[i+1].x-path[i].x);
+    ctx.save();ctx.translate(path[i].x,path[i].y);ctx.rotate(a);
+    ctx.fillStyle='rgba(255,107,53,.22)';
+    ctx.beginPath();ctx.moveTo(-5,-3);ctx.lineTo(5,0);ctx.lineTo(-5,3);ctx.fill();
+    ctx.restore();
+  }
+
+  // start/end
+  const mkr=(pt,col,lbl)=>{
+    ctx.fillStyle=col+'22';ctx.strokeStyle=col;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(pt.x,pt.y,13,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle=col;ctx.font='bold 8px Orbitron,monospace';
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(lbl,pt.x,pt.y);
+  };
+  mkr(path[0],'#7fff00','START');
+  mkr(path[path.length-1],'#ff3366','END');
+
+  // towers
+  for(const t of towers)drawTower(t.x,t.y,t.type,t.angle,t.level);
+
+  // ghost
+  if(selectedType&&!isSellMode&&showGhost){
+    const def=TOWER_DEFS[selectedType];
+    ctx.save();
+    ctx.strokeStyle=def.color+'50';ctx.setLineDash([5,5]);ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(mouseX,mouseY,def.range,0,Math.PI*2);ctx.stroke();
+    ctx.setLineDash([]);ctx.globalAlpha=.4;drawTower(mouseX,mouseY,selectedType,0,1);ctx.globalAlpha=1;
+    ctx.restore();
+  }
+
+  // selected range
+  if(selectedTower){
+    ctx.save();
+    ctx.strokeStyle=selectedTower.def.color+'40';ctx.fillStyle=selectedTower.def.color+'08';
+    ctx.setLineDash([4,4]);ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(selectedTower.x,selectedTower.y,selectedTower.def.range,0,Math.PI*2);
+    ctx.fill();ctx.stroke();ctx.setLineDash([]);ctx.restore();
+  }
+
+  // projectiles
+  for(const p of projectiles){
+    if(p.type==='laser'){
+      const tx=p.target?p.target.x:p.x+200,ty=p.target?p.target.y:p.y;
+      ctx.save();ctx.shadowColor=p.color;ctx.shadowBlur=10;
+      ctx.strokeStyle=p.color;ctx.lineWidth=2;ctx.globalAlpha=Math.min(p.life*2,1);
+      ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(tx,ty);ctx.stroke();
+      ctx.globalAlpha=.2;ctx.lineWidth=7;
+      ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(tx,ty);ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.save();ctx.fillStyle=p.color;ctx.shadowColor=p.color;ctx.shadowBlur=8;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r||3,0,Math.PI*2);ctx.fill();ctx.restore();
+    }
+  }
+
+  // enemies
+  for(const e of enemies){
+    ctx.save();ctx.translate(e.x,e.y);
+    ctx.fillStyle='rgba(0,0,0,.3)';
+    ctx.beginPath();ctx.ellipse(0,e.r+2,e.r*.8,3,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=e.dotTimer>0?'#99ff44':e.slowTimer>0?'#88ccff':e.color;
+    ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=8;
+    ctx.beginPath();ctx.arc(0,0,e.r,0,Math.PI*2);ctx.fill();
+    const bw=e.r*2.5,bh=3,bx=-bw/2,by=-e.r-7;
+    ctx.fillStyle='#111';ctx.shadowBlur=0;ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle=e.hp/e.maxHp>.5?'#7fff00':e.hp/e.maxHp>.2?'#ff6b35':'#ff3366';
+    ctx.fillRect(bx,by,bw*(e.hp/e.maxHp),bh);
+    ctx.restore();
+  }
+
+  // particles
+  for(const p of particles){
+    ctx.save();ctx.fillStyle=p.color;ctx.globalAlpha=Math.min(p.life*3,1);
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+}
+
+function drawTower(x,y,type,angle,level=1){
+  const def=TOWER_DEFS[type];
+  const sc=1+Math.min(level-1,9)*0.06; // slight grow per level, cap at +54%
+  ctx.save();ctx.translate(x,y);ctx.scale(sc,sc);
+  ctx.fillStyle='#1a2030';ctx.strokeStyle=def.color+'78';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(0,0,15,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle=def.color;ctx.shadowColor=def.color;ctx.shadowBlur=6;ctx.rotate(angle);
+  if(type==='arrow'){
+    ctx.fillRect(-2,-8,4,10);
+    ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(-4,-6);ctx.lineTo(4,-6);ctx.fill();
+  }else if(type==='cannon'){
+    ctx.beginPath();ctx.arc(0,0,7,0,Math.PI*2);ctx.fill();
+    ctx.fillRect(0,-3.5,11,7);
+    ctx.beginPath();ctx.arc(11,0,4.5,0,Math.PI*2);ctx.fill();
+  }else if(type==='laser'){
+    ctx.strokeStyle=def.color;ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(10,0);ctx.stroke();
+    ctx.beginPath();ctx.arc(0,0,5,0,Math.PI*2);ctx.fill();
+  }else if(type==='freeze'){
+    for(let i=0;i<6;i++){ctx.save();ctx.rotate(i*Math.PI/3);ctx.fillRect(-1.5,-9,3,18);ctx.restore();}
+    ctx.beginPath();ctx.arc(0,0,4,0,Math.PI*2);ctx.fill();
+  }else if(type==='missile'){
+    ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(-4,-5);ctx.lineTo(-2,0);ctx.lineTo(-4,5);ctx.closePath();ctx.fill();
+  }else if(type==='poison'){
+    ctx.beginPath();ctx.arc(0,0,8,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=.25;ctx.shadowBlur=18;
+    ctx.beginPath();ctx.arc(0,0,14,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+  }
+  ctx.restore();
+
+  // level badge (only show Lv2+)
+  if(level>1){
+    ctx.save();ctx.translate(x,y);
+    const lx=10*sc, ly=-10*sc;
+    ctx.fillStyle='#ffd700';ctx.strokeStyle='#0a0c10';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(lx,ly,7,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#0a0c10';ctx.font=`bold 7px Orbitron,monospace`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(level>9?'9+':`${level}`,lx,ly);
+    ctx.restore();
+  }
+}
+
+// ── Input ──────────────────────────────────────────────
+function canvasPos(cx,cy){
+  const r=canvas.getBoundingClientRect();
+  return{x:cx-r.left,y:cy-r.top};
+}
+
+canvas.addEventListener('mousemove',e=>{
+  const p=canvasPos(e.clientX,e.clientY);mouseX=p.x;mouseY=p.y;showGhost=true;
+});
+canvas.addEventListener('mouseleave',()=>showGhost=false);
+canvas.addEventListener('click',e=>tap(canvasPos(e.clientX,e.clientY)));
+
+let ts0=null;
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  if(e.touches.length===1){
+    const p=canvasPos(e.touches[0].clientX,e.touches[0].clientY);
+    ts0={...p};mouseX=p.x;mouseY=p.y;showGhost=true;
+  }
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1){
+    const p=canvasPos(e.touches[0].clientX,e.touches[0].clientY);mouseX=p.x;mouseY=p.y;
+  }
+},{passive:false});
+canvas.addEventListener('touchend',e=>{
+  e.preventDefault();showGhost=false;
+  if(ts0){
+    const p=canvasPos(e.changedTouches[0].clientX,e.changedTouches[0].clientY);
+    if(Math.hypot(p.x-ts0.x,p.y-ts0.y)<14)tap(p);
+    ts0=null;
+  }
+},{passive:false});
+
+function tap({x,y}){
+  if(isSellMode){
+    for(let i=towers.length-1;i>=0;i--){
+      if(Math.hypot(towers[i].x-x,towers[i].y-y)<22){
+        const t=towers[i];
+        // refund 50% of base cost + all upgrade costs paid
+        let totalPaid=t.def.cost;
+        for(let lv=1;lv<t.level;lv++) totalPaid+=Math.floor(t.def.cost/4*Math.pow(1.5,lv-1));
+        const ref=Math.floor(totalPaid*.5);
+        pts+=ref;updateHUD();
+        msg(`出售 ${t.def.name} Lv${t.level}，回收 ${ref} 點`,'#ff6b35');
+        towers.splice(i,1);selectedTower=null;
+        document.getElementById('towerInfo').style.display='none';
+        document.getElementById('mob-tower-info').style.display='none';
+        return;
+      }
+    }
+    return;
+  }
+  for(const t of towers){
+    if(Math.hypot(t.x-x,t.y-y)<20){selectedTower=t;selectedType=null;updateUI();showTowerInfo(t);return;}
+  }
+  selectedTower=null;
+  document.getElementById('towerInfo').style.display='none';
+  document.getElementById('mob-tower-info').style.display='none';
+  if(selectedType)placeTower(x,y);
+}
+
+function showTowerInfo(t){
+  document.getElementById('towerInfo').style.display='block';
+  const uc=upgradeCost(t);
+  const canUpg=pts>=uc;
+  const statsHtml=`
+    <div class="ir"><span class="ik">類型</span><span class="iv" style="color:${t.def.color}">${t.def.name}</span></div>
+    <div class="ir"><span class="ik">等級</span><span class="iv" style="color:#ffd700">Lv ${t.level}</span></div>
+    <div class="ir"><span class="ik">攻擊力</span><span class="iv">${Math.round(t.dmg)}</span></div>
+    <div class="ir"><span class="ik">射速</span><span class="iv">${t.rate.toFixed(2)}/s</span></div>
+    <div class="ir"><span class="ik">射程</span><span class="iv">${t.def.range}</span></div>
+    <button onclick="upgradeTower(selectedTower)"
+      style="margin-top:7px;width:100%;padding:7px 4px;
+        background:${canUpg?'rgba(255,215,0,.15)':'rgba(80,80,80,.15)'};
+        border:1px solid ${canUpg?'#ffd700':'#555'};
+        color:${canUpg?'#ffd700':'#555'};
+        font-family:Orbitron,sans-serif;font-size:9px;letter-spacing:1px;cursor:${canUpg?'pointer':'not-allowed'}">
+      ▲ 升級 ${uc} 點<br>
+      <span style="font-size:8px;opacity:.7">→ 攻擊 ×1.3 · 射速 ×1.2</span>
+    </button>
+  `;
+  document.getElementById('infoContent').innerHTML=statsHtml;
+
+  // mobile panel
+  const mob=document.getElementById('mob-tower-info');
+  const mobContent=document.getElementById('mob-info-content');
+  mob.style.display='block';
+  mobContent.innerHTML=`
+    <div class="mob-info-stat" style="color:${t.def.color};font-family:Orbitron,monospace;font-size:10px;font-weight:700">${t.def.name}</div>
+    <div class="mob-info-stat lv">等級 <span>Lv${t.level}</span></div>
+    <div class="mob-info-stat">攻擊 <span>${Math.round(t.dmg)}</span></div>
+    <div class="mob-info-stat">射速 <span>${t.rate.toFixed(1)}</span></div>
+    <button class="mob-upg-btn${canUpg?'':' cant-afford'}" onclick="upgradeTower(selectedTower)">
+      ▲ 升級<br><span style="font-size:8px">${uc}pt</span>
+    </button>
+  `;
+}
+
+function updateUI(){
+  document.querySelectorAll('.tw-btn,.mb-btn').forEach(b=>{
+    const tp=b.dataset.type;if(!tp)return;
+    b.classList.toggle('selected',tp===selectedType);
+    b.classList.toggle('cant-afford',pts<TOWER_DEFS[tp].cost);
+  });
+  ['sbSellBtn','mobSellBtn'].forEach(id=>{
+    const e=document.getElementById(id);if(e)e.classList.toggle('selected',isSellMode);
+  });
+}
+
+function updateHUD(){
+  document.getElementById('h-pts').textContent=pts;
+  document.getElementById('h-lives').textContent=lives;
+  document.getElementById('h-wave').textContent=wave;
+  document.getElementById('h-score').textContent=score;
+  updateUI();
+  // refresh upgrade button affordability if a tower is selected
+  if(selectedTower) showTowerInfo(selectedTower);
+}
+
+function msg(text,color='#c8d8e8'){
+  const log=document.getElementById('msgLog');
+  const d=document.createElement('div');
+  d.className='msg';d.style.color=color;d.textContent=text;
+  log.appendChild(d);setTimeout(()=>d.remove(),2600);
+}
+
+// ── Game flow ──────────────────────────────────────────
+function startGame(){
+  document.getElementById('startOverlay').style.display='none';
+  gameStarted=true;resize();updateHUD();
+  msg('選擇武器，點擊地圖放置！','#00d4ff');
+  requestAnimationFrame(loop);
+}
+
+function endGame(){
+  gameOver=true;
+  document.getElementById('endOverlay').style.display='flex';
+  document.getElementById('endSub').textContent=`第 ${wave} 波時基地失守`;
+  document.getElementById('endScore').textContent=`最終分數: ${score}`;
+}
+
+function restartGame(){
+  pts=200;lives=20;score=0;wave=0;
+  towers=[];enemies=[];projectiles=[];particles=[];spawnQueue=[];
+  selectedType=null;selectedTower=null;
+  waveRunning=false;gameOver=false;isSellMode=false;showGhost=false;
+  document.getElementById('endOverlay').style.display='none';
+  document.getElementById('towerInfo').style.display='none';
+  document.getElementById('mob-tower-info').style.display='none';
+  ['sbSellBtn','mobSellBtn'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
+  setWaveBtns(false);buildPath();updateHUD();
+  msg('遊戲重新開始！','#00d4ff');
+}
+
+// init
+resize();
+requestAnimationFrame(function pre(ts){
+  if(!gameStarted){draw();requestAnimationFrame(pre);}
+});
+</script>
+</body>
+</html>
