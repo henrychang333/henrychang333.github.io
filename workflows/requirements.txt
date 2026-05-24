@@ -1,0 +1,9 @@
+requests
+pandas as pd
+os
+datetime
+dateutil.relativedelta
+time
+urllib3
+webbrowser
+date
