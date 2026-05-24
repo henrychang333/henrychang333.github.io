@@ -1,0 +1,7 @@
+requests
+pandas
+os
+datetime
+dateutil.relativedelta
+time
+urllib3
