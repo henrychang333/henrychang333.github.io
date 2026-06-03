@@ -1,61 +1,598 @@
-<table id="stocks"></table>
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>即時股票行情表 - 純API資料 | 可排序</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Roboto', 'Noto Sans TC', system-ui, -apple-system, '微軟正黑體', sans-serif;
+            background: linear-gradient(145deg, #f0f2f8 0%, #e9ecf3 100%);
+            margin: 0;
+            padding: 24px 20px;
+            min-height: 100vh;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.6);
+            border-radius: 36px;
+            backdrop-filter: blur(2px);
+            box-shadow: 0 20px 35px -12px rgba(0,0,0,0.2);
+            padding: 20px 24px 32px 24px;
+            transition: all 0.2s ease;
+        }
+
+        .header-area {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+            border-bottom: 2px solid rgba(60, 80, 120, 0.2);
+            padding-bottom: 12px;
+        }
+        .title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1a2a4f, #2c3e6d);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .title::before {
+            content: "📈";
+            font-size: 1.8rem;
+            background: none;
+            color: #2c5f8a;
+        }
+        .live-badge {
+            background: #d32f2f10;
+            backdrop-filter: blur(4px);
+            padding: 6px 14px;
+            border-radius: 60px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #b91c1c;
+            border: 1px solid #ffcdd2;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+        }
+        .live-badge span {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #e53935;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 1.2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.4; transform: scale(0.8);}
+            100% { opacity: 1; transform: scale(1.2);}
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 24px;
+            background: #ffffffcc;
+            backdrop-filter: blur(2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+        }
+
+        .stock-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.95rem;
+            min-width: 900px;
+            background: white;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+
+        .stock-table thead tr {
+            background: #1f2b48;
+            background: linear-gradient(98deg, #1a253f 0%, #1f2d4e 100%);
+        }
+        .stock-table th {
+            color: #f0f3fa;
+            font-weight: 600;
+            font-size: 0.9rem;
+            letter-spacing: 0.5px;
+            padding: 16px 14px;
+            text-align: center;
+            border-bottom: 2px solid #2c3e6d;
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s ease;
+            position: relative;
+        }
+        .stock-table th:hover {
+            background: #2c3e66;
+            filter: brightness(1.05);
+        }
+        /* 排序指示器小箭頭 */
+        .sort-indicator {
+            display: inline-block;
+            margin-left: 8px;
+            font-size: 0.7rem;
+            opacity: 0.9;
+            font-weight: normal;
+        }
+        .sort-indicator.asc::after {
+            content: "▲";
+        }
+        .sort-indicator.desc::after {
+            content: "▼";
+        }
+
+        .stock-table td {
+            padding: 14px 12px;
+            text-align: center;
+            border-bottom: 1px solid #e9edf2;
+            background-color: #ffffff;
+            transition: background 0.2s ease;
+            font-weight: 500;
+        }
+
+        /* 欄位寬度設定 */
+        .stock-table th:nth-child(1) { width: 9%; }
+        .stock-table th:nth-child(2) { width: 15%; }
+        .stock-table th:nth-child(3) { width: 9%; }
+        .stock-table th:nth-child(4) { width: 9%; }
+        .stock-table th:nth-child(5) { width: 9%; }
+        .stock-table th:nth-child(6) { width: 11%; }
+        .stock-table th:nth-child(7) { width: 11%; }
+        .stock-table th:nth-child(8) { width: 12%; }
+
+        .stock-table td:nth-child(2) {
+            text-align: left;
+            font-weight: 600;
+            color: #1e2a3e;
+        }
+        .stock-table td:nth-child(1) {
+            font-weight: 500;
+            background-color: #fafcff;
+        }
+        .stock-table td:nth-child(3) {
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            color: #2c5282;
+        }
+        .stock-table td:nth-child(4),
+        .stock-table td:nth-child(5),
+        .stock-table td:nth-child(8) {
+            text-align: right;
+            font-family: 'JetBrains Mono', 'SF Mono', monospace;
+            font-weight: 500;
+            padding-right: 20px;
+        }
+        .stock-table td:nth-child(6),
+        .stock-table td:nth-child(7) {
+            text-align: center;
+            font-weight: 700;
+            font-size: 1rem;
+            font-family: 'Segoe UI', system-ui, monospace;
+        }
+
+        /* 紅綠背景 (正值紅背景，負值綠背景) */
+        .positive-bg {
+            background-color: #ffe5e5 !important;
+            color: #b91c1c !important;
+            border-left: 3px solid #e53e3e;
+            border-right: 3px solid #e53e3e;
+        }
+        .negative-bg {
+            background-color: #e6f7e6 !important;
+            color: #2e7d32 !important;
+            border-left: 3px solid #2e7d32;
+            border-right: 3px solid #2e7d32;
+        }
+        .stock-table tr:hover td {
+            background-color: #f8faff;
+        }
+        .stock-table tr:hover td.positive-bg {
+            background-color: #ffd9d9 !important;
+        }
+        .stock-table tr:hover td.negative-bg {
+            background-color: #daf5da !important;
+        }
+        .volume-number {
+            font-weight: 600;
+        }
+
+        .footer-note {
+            margin-top: 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.75rem;
+            color: #3e5a7c;
+            background: #ffffffb3;
+            padding: 8px 20px;
+            border-radius: 60px;
+            backdrop-filter: blur(4px);
+        }
+        .update-time {
+            font-family: monospace;
+            font-weight: 500;
+        }
+        .sort-hint {
+            background: #eef2ff;
+            padding: 4px 12px;
+            border-radius: 32px;
+            font-size: 0.7rem;
+            color: #1f3a6b;
+        }
+
+        @media (max-width: 750px) {
+            body { padding: 16px 12px; }
+            .dashboard-container { padding: 16px; }
+            .title { font-size: 1.4rem; }
+            .stock-table th, .stock-table td { padding: 10px 8px; }
+            .sort-hint { display: none; }
+        }
+        
+        /* 錯誤與空狀態提示 */
+        .error-placeholder {
+            text-align: center;
+            padding: 48px 20px;
+            background: #fff5f5;
+            color: #c53030;
+            font-weight: 500;
+            border-radius: 20px;
+        }
+        .empty-placeholder {
+            text-align: center;
+            padding: 48px 20px;
+            color: #4a5568;
+            background: #f7fafc;
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard-container">
+    <div class="header-area">
+        <div class="title">
+            台股看看
+        </div>
+        <div class="live-badge">
+            <span></span> 即時同步 (10s)
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table id="stocks" class="stock-table">
+            <thead>
+                <tr>
+                    <th>📂 分類</th>
+                    <th>🏢 公司</th>
+                    <th>🔢 代號</th>
+                    <th>📉 昨收</th>
+                    <th data-sort="price">💰 現價 <span class="sort-indicator"></span></th>
+                    <th data-sort="change">📊 漲跌 <span class="sort-indicator"></span></th>
+                    <th data-sort="percent">📈 漲跌% <span class="sort-indicator"></span></th>
+                    <th>🧾 成交量</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="loading-placeholder"><td colspan="8">✨ 等待API資料載入... ✨</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="footer-note">
+        <div>
+            <span>🔔 紅底為漲｜綠底為跌</span>
+            <span class="sort-hint">✨ 點擊「現價 / 漲跌 / 漲跌%」欄位可排序 ✨</span>
+        </div>
+        <span>⏱️ 最後更新: <span id="lastUpdateTime" class="update-time">--:--:--</span></span>
+    </div>
+</div>
 
 <script>
-const API = "https://script.google.com/macros/s/AKfycbxGQd5SCE7L6UbK5kAbb9-UsSDMXTrAmnyAGedH97guuU3363PjM65GSCEjqSO3Cu_eWg/exec";
-
-function render() {
-  fetch(API + "?t=" + Date.now()) // 防快取
-    .then(r => r.json())
-    .then(data => {
-
-      let html = `
-      <tr>
-        <th>分類</th>
-        <th>公司</th>
-        <th>代號</th>
-        <th>昨收</th>
-        <th>現價</th>
-        <th>漲跌</th>
-        <th>漲跌%</th>
-        <th>成交量</th>
-      </tr>`;
-
-      data.forEach(item => {
-
-        const change = Number(item.漲跌);
-        const percent = Number(item.漲跌百分比);
-
-        const isUp = change >= 0;
-        const arrow = isUp ? "▲" : "▼";
-        const color = isUp ? "red" : "green";
-
-        html += `
-        <tr>
-          <td>${item.分類}</td>
-          <td>${item.公司}</td>
-          <td>${item.股票代號}</td>
-          <td>${item.前一天收盤價}</td>
-          <td>${item.現價}</td>
-
-          <td style="color:${color};font-weight:bold;">
-            ${arrow} ${change}
-          </td>
-
-          <td style="color:${color};font-weight:bold;">
-            ${arrow} ${percent}%
-          </td>
-
-          <td>${item.成交量}</td>
-        </tr>`;
-      });
-
-      document.getElementById("stocks").innerHTML = html;
+    // ======================== 全域狀態 ========================
+    let currentData = [];          // 儲存目前最新原始資料 (由API取得)
+    let sortField = null;          // 'price', 'change', 'percent'
+    let sortOrder = 'asc';         // 'asc' 或 'desc'
+    
+    // API 端點 (與原始設計一致，完全依賴此端點，無任何模擬數據)
+    const API = "https://script.google.com/macros/s/AKfycbxGQd5SCE7L6UbK5kAbb9-UsSDMXTrAmnyAGedH97guuU3363PjM65GSCEjqSO3Cu_eWg/exec";
+    
+    // ---------- 輔助函式 ----------
+    function escapeHtml(str) {
+        if (!str && str !== 0) return '';
+        return String(str).replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+    
+    // 成交量千分位
+    function formatVolume(vol) {
+        if (vol === undefined || vol === null) return "0";
+        return Number(vol).toLocaleString('en-US');
+    }
+    
+    // 更新頁面時間戳記
+    function updateTimestamp() {
+        const timeSpan = document.getElementById("lastUpdateTime");
+        if (timeSpan) {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('zh-TW', { hour12: false });
+            timeSpan.innerText = timeStr;
+        }
+    }
+    
+    // 依照目前的 sortField / sortOrder 排序 currentData
+    function getSortedData() {
+        if (!sortField) return [...currentData];
+        
+        const sorted = [...currentData];
+        sorted.sort((a, b) => {
+            let valA, valB;
+            if (sortField === 'price') {
+                valA = Number(a.現價) || 0;
+                valB = Number(b.現價) || 0;
+            } else if (sortField === 'change') {
+                valA = Number(a.漲跌) || 0;
+                valB = Number(b.漲跌) || 0;
+            } else if (sortField === 'percent') {
+                valA = Number(a.漲跌百分比) || 0;
+                valB = Number(b.漲跌百分比) || 0;
+            } else {
+                return 0;
+            }
+            
+            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+        return sorted;
+    }
+    
+    // 繪製表格 (根據傳入的資料)
+    function renderTableWithData(dataArray) {
+        const stockTable = document.getElementById("stocks");
+        if (!stockTable) return;
+        
+        // 確保 thead 存在並更新排序指示器
+        let thead = stockTable.querySelector("thead");
+        if (!thead) {
+            thead = document.createElement("thead");
+            thead.innerHTML = `<tr><th>📂 分類</th><th>🏢 公司</th><th>🔢 代號</th><th>📉 昨收</th><th data-sort="price">💰 現價 <span class="sort-indicator"></span></th><th data-sort="change">📊 漲跌 <span class="sort-indicator"></span></th><th data-sort="percent">📈 漲跌% <span class="sort-indicator"></span></th><th>🧾 成交量</th></tr>`;
+            stockTable.prepend(thead);
+        }
+        
+        // 更新排序圖標
+        const allThs = thead.querySelectorAll("th[data-sort]");
+        allThs.forEach(th => {
+            const field = th.getAttribute("data-sort");
+            const indicatorSpan = th.querySelector(".sort-indicator");
+            if (indicatorSpan) {
+                indicatorSpan.className = "sort-indicator";
+                if (sortField === field) {
+                    indicatorSpan.classList.add(sortOrder === 'asc' ? 'asc' : 'desc');
+                } else {
+                    indicatorSpan.classList.remove('asc', 'desc');
+                }
+            }
+        });
+        
+        // 移除舊 tbody
+        const oldBodies = stockTable.querySelectorAll("tbody");
+        oldBodies.forEach(tbody => tbody.remove());
+        
+        // 建立新 tbody
+        const newTbody = document.createElement("tbody");
+        
+        if (!dataArray || dataArray.length === 0) {
+            newTbody.innerHTML = `<tr><td colspan="8" class="empty-placeholder">📭 目前無股票資料，請確認 API 是否正常回傳</td></tr>`;
+            stockTable.appendChild(newTbody);
+            return;
+        }
+        
+        let htmlRows = '';
+        for (const item of dataArray) {
+            // 安全取值 - 完全依照原始API預期欄位
+            const category = item.分類 || item.category || '--';
+            const company = item.公司 || item.company || '--';
+            const symbol = item.股票代號 || item.symbol || '----';
+            const prevClose = (item.前一天收盤價 !== undefined && item.前一天收盤價 !== null) 
+                ? Number(item.前一天收盤價).toFixed(2) 
+                : (item.prevClose !== undefined ? Number(item.prevClose).toFixed(2) : '--');
+            const currentPrice = (item.現價 !== undefined && item.現價 !== null) 
+                ? Number(item.現價).toFixed(2) 
+                : (item.price !== undefined ? Number(item.price).toFixed(2) : '--');
+            
+            let change = Number(item.漲跌);
+            if (isNaN(change) && item.change !== undefined) change = Number(item.change);
+            if (isNaN(change)) change = 0;
+            
+            let percent = Number(item.漲跌百分比);
+            if (isNaN(percent) && item.percent !== undefined) percent = Number(item.percent);
+            if (isNaN(percent)) percent = 0;
+            
+            const isUp = change >= 0;
+            const arrow = isUp ? "▲" : "▼";
+            const changeAbs = Math.abs(change).toFixed(2);
+            const percentAbs = Math.abs(percent).toFixed(2);
+            
+            const bgClass = (change > 0) ? "positive-bg" : (change < 0) ? "negative-bg" : "";
+            const percentBgClass = (change > 0) ? "positive-bg" : (change < 0) ? "negative-bg" : "";
+            
+            let volumeRaw = item.成交量;
+            if (volumeRaw === undefined || volumeRaw === null) volumeRaw = item.volume;
+            const volumeFormatted = formatVolume(volumeRaw);
+            
+            htmlRows += `
+                <tr>
+                    <td>${escapeHtml(category)}</td>
+                    <td>${escapeHtml(company)}</td>
+                    <td>${escapeHtml(symbol)}</td>
+                    <td>${prevClose}</td>
+                    <td>${currentPrice}</td>
+                    <td class="${bgClass}">${arrow} ${changeAbs}</td>
+                    <td class="${percentBgClass}">${arrow} ${percentAbs}%</td>
+                    <td class="volume-number">${volumeFormatted}</td>
+                </tr>
+            `;
+        }
+        newTbody.innerHTML = htmlRows;
+        stockTable.appendChild(newTbody);
+    }
+    
+    // 從 API 獲取資料 (無任何模擬備援，完全真實請求)
+    async function fetchRealDataFromAPI() {
+        const url = API + "?t=" + Date.now();
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status} - 無法取得資料`);
+        }
+        const data = await response.json();
+        // 驗證是否為陣列且至少有一筆必要欄位
+        if (!Array.isArray(data)) {
+            throw new Error("API 回傳格式不是陣列");
+        }
+        if (data.length > 0) {
+            const firstItem = data[0];
+            // 檢查是否有預期欄位 (至少要有股票代號、公司或現價其中一個關鍵)
+            const hasExpectedField = firstItem.股票代號 || firstItem.symbol || firstItem.公司 || firstItem.company;
+            if (!hasExpectedField) {
+                console.warn("API 回傳資料欄位不符合預期 (缺少股票代號/公司/現價等)", firstItem);
+            }
+        }
+        return data;
+    }
+    
+    // 核心渲染：呼叫真實API -> 更新全域 currentData -> 排序後繪製
+    async function fetchAndRender() {
+        const stockTable = document.getElementById("stocks");
+        try {
+            // 顯示載中提示 (保留表格結構但顯示載入訊息)
+            const existingTbody = stockTable.querySelector("tbody");
+            if (existingTbody && currentData.length === 0) {
+                existingTbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:40px;">🔄 正在從 API 抓取資料... 🔄</td></tr>`;
+            }
+            
+            const rawData = await fetchRealDataFromAPI();
+            
+            if (rawData && Array.isArray(rawData)) {
+                currentData = rawData.map(item => ({ ...item }));
+                if (currentData.length === 0) {
+                    // 空陣列情況
+                    renderTableWithData([]);
+                } else {
+                    const sortedData = getSortedData();
+                    renderTableWithData(sortedData);
+                }
+            } else {
+                // 非陣列或無效資料
+                currentData = [];
+                renderTableWithData([]);
+            }
+            updateTimestamp();
+        } catch (error) {
+            console.error("API 請求失敗:", error);
+            // 顯示錯誤訊息，不產生任何模擬資料
+            currentData = [];
+            const stockTableElem = document.getElementById("stocks");
+            if (stockTableElem) {
+                const oldBodies = stockTableElem.querySelectorAll("tbody");
+                oldBodies.forEach(tb => tb.remove());
+                const errorBody = document.createElement("tbody");
+                errorBody.innerHTML = `<tr><td colspan="8" class="error-placeholder">⚠️ 無法連線至資料來源 (${API})<br>請確認 API 伺服器是否正常運作，或檢查網路設定 ⚠️</td></tr>`;
+                stockTableElem.appendChild(errorBody);
+            }
+            updateTimestamp();
+        }
+    }
+    
+    // ========== 排序邏輯 & 綁定點擊事件 ==========
+    function setSorting(field) {
+        if (sortField === field) {
+            // 相同欄位則切換排序順序
+            sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortField = field;
+            sortOrder = 'asc';
+        }
+        // 依據目前的 currentData 重新排序並繪製表格
+        if (currentData.length > 0) {
+            const sorted = getSortedData();
+            renderTableWithData(sorted);
+        } else {
+            // 無資料時僅更新指示器外觀
+            const stockTable = document.getElementById("stocks");
+            if (stockTable) {
+                const thead = stockTable.querySelector("thead");
+                if (thead) {
+                    const allThs = thead.querySelectorAll("th[data-sort]");
+                    allThs.forEach(th => {
+                        const f = th.getAttribute("data-sort");
+                        const indicatorSpan = th.querySelector(".sort-indicator");
+                        if (indicatorSpan) {
+                            indicatorSpan.className = "sort-indicator";
+                            if (sortField === f) {
+                                indicatorSpan.classList.add(sortOrder === 'asc' ? 'asc' : 'desc');
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    }
+    
+    // 綁定表格 th 點擊事件 (事件委託)
+    function bindSortEvents() {
+        const table = document.getElementById("stocks");
+        if (!table) return;
+        table.addEventListener("click", (e) => {
+            const th = e.target.closest("th[data-sort]");
+            if (!th) return;
+            const field = th.getAttribute("data-sort");
+            if (field === 'price') setSorting('price');
+            else if (field === 'change') setSorting('change');
+            else if (field === 'percent') setSorting('percent');
+        });
+    }
+    
+    // ---------- 初始化與定時器 (完全無模擬數據，僅 API) ----------
+    async function init() {
+        bindSortEvents();
+        
+        // 初次載入 (完全真實 API)
+        await fetchAndRender();
+        
+        // 設置定時器每10秒更新一次 (僅依靠真實 API)
+        if (window._stockInterval) clearInterval(window._stockInterval);
+        window._stockInterval = setInterval(() => {
+            fetchAndRender();
+        }, 10000);
+    }
+    
+    // 頁面關閉清理
+    window.addEventListener("beforeunload", () => {
+        if (window._stockInterval) clearInterval(window._stockInterval);
     });
-}
-
-// 🔁 初次載入
-render();
-
-// 🔄 每 10 秒更新（即時行情效果）
-setInterval(render, 10000);
+    
+    // 啟動
+    init();
 </script>
+</body>
+</html>
