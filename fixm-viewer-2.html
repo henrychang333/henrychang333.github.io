@@ -11,7 +11,6 @@
         .tag { font-family: monospace; font-size: 0.75rem; color: #6b7280; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
         .full-path { font-family: monospace; font-size: 0.78rem; color: #64748b; word-break: break-all; overflow-wrap: break-word; line-height: 1.35; }
         #threeContainer { height: 520px; background: #0f172a; border-radius: 16px; overflow: hidden; border: 1px solid #334155; }
-        .error-box { background: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 12px; border-radius: 8px; font-size: 0.9rem; }
     </style>
 </head>
 <body class="bg-gray-50 py-8">
@@ -38,7 +37,7 @@
                 <div>
                     <h2 class="text-2xl font-semibold mb-3">🌍 3D 航路圖</h2>
                     <div id="threeContainer"></div>
-                    <div id="threeStatus" class="text-center text-sm mt-2 text-gray-500"></div>
+                    <p id="threeStatus" class="text-center text-sm mt-2 font-medium text-amber-600"></p>
                 </div>
 
                 <div>
@@ -94,90 +93,89 @@
 
             renderAllFlightFields(xml);
             renderRouteTable(xml);
-            render3DPath(xml);
+            render3DPath(xml);           // 3D
             renderXMLTree(xml.documentElement, document.getElementById("xmlTree"));
 
             document.getElementById("result").classList.remove("hidden");
         }
 
-        // ====================== 3D 航路圖（加強錯誤處理） ======================
         function render3DPath(doc) {
             const container = document.getElementById("threeContainer");
             const status = document.getElementById("threeStatus");
-            container.innerHTML = `<div class="h-full flex items-center justify-center text-gray-400">載入中...</div>`;
+            container.innerHTML = `<div class="h-full flex items-center justify-center text-white">正在初始化 3D 場景...</div>`;
 
-            try {
-                if (typeof THREE === "undefined") {
-                    throw new Error("Three.js 載入失敗");
-                }
+            setTimeout(() => {   // 延遲一點確保 DOM 準備好
+                try {
+                    if (typeof THREE === "undefined") throw new Error("Three.js 未載入");
 
-                scene = new THREE.Scene();
-                camera = new THREE.PerspectiveCamera(60, container.clientWidth / 520, 1, 20000);
-                renderer = new THREE.WebGLRenderer({ antialias: true });
-                renderer.setSize(container.clientWidth, 520);
-                container.innerHTML = "";
-                container.appendChild(renderer.domElement);
+                    const scene = new THREE.Scene();
+                    const camera = new THREE.PerspectiveCamera(60, container.clientWidth / 520, 1, 20000);
+                    const renderer = new THREE.WebGLRenderer({ antialias: true });
+                    renderer.setSize(container.clientWidth, 520);
+                    container.innerHTML = "";
+                    container.appendChild(renderer.domElement);
 
-                // 地球
-                const earth = new THREE.Mesh(
-                    new THREE.SphereGeometry(6371, 48, 48),
-                    new THREE.MeshPhongMaterial({ color: 0x1e40af })
-                );
-                scene.add(earth);
+                    // 地球
+                    const earth = new THREE.Mesh(
+                        new THREE.SphereGeometry(6371, 48, 48),
+                        new THREE.MeshPhongMaterial({ color: 0x1e40af })
+                    );
+                    scene.add(earth);
 
-                scene.add(new THREE.AmbientLight(0xaaaaaa));
-                const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-                sun.position.set(10000, 10000, 10000);
-                scene.add(sun);
+                    scene.add(new THREE.AmbientLight(0xaaaaaa));
+                    const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+                    sun.position.set(10000, 10000, 10000);
+                    scene.add(sun);
 
-                // 收集點位
-                const points = [];
-                doc.querySelectorAll("element").forEach(el => {
-                    const posNode = el.querySelector("pos");
-                    if (posNode) {
-                        const [lat, lon] = posNode.textContent.trim().split(/\s+/).map(Number);
-                        if (!isNaN(lat) && !isNaN(lon)) {
-                            const alt = parseFloat(el.querySelector("altitude, flightLevel")?.textContent || 5000) / 1000;
-                            const phi = (90 - lat) * (Math.PI / 180);
-                            const theta = (lon + 180) * (Math.PI / 180);
-                            const r = 6371 + alt;
-
-                            points.push(new THREE.Vector3(
-                                r * Math.sin(phi) * Math.cos(theta),
-                                r * Math.cos(phi),
-                                r * Math.sin(phi) * Math.sin(theta)
-                            ));
+                    // 收集座標
+                    const points = [];
+                    doc.querySelectorAll("element").forEach(el => {
+                        const pos = el.querySelector("pos");
+                        if (pos) {
+                            const [lat, lon] = pos.textContent.trim().split(/\s+/).map(Number);
+                            if (!isNaN(lat) && !isNaN(lon)) {
+                                const alt = parseFloat(el.querySelector("altitude, flightLevel")?.textContent || 5000) / 1000;
+                                const phi = (90 - lat) * Math.PI / 180;
+                                const theta = (lon + 180) * Math.PI / 180;
+                                const r = 6371 + alt;
+                                points.push(new THREE.Vector3(
+                                    r * Math.sin(phi) * Math.cos(theta),
+                                    r * Math.cos(phi),
+                                    r * Math.sin(phi) * Math.sin(theta)
+                                ));
+                            }
                         }
+                    });
+
+                    if (points.length > 1) {
+                        const line = new THREE.Line(
+                            new THREE.BufferGeometry().setFromPoints(points),
+                            new THREE.LineBasicMaterial({ color: 0xffcc00, linewidth: 6 })
+                        );
+                        scene.add(line);
+                        status.innerHTML = `✅ 成功繪製 <b>${points.length}</b> 個航路點`;
+                    } else {
+                        status.innerHTML = `⚠️ 找不到航路點座標 (pos)`;
                     }
-                });
 
-                if (points.length > 1) {
-                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                    pathLine = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xffcc00, linewidth: 6 }));
-                    scene.add(pathLine);
-                    status.innerHTML = `✅ 已繪製 <b>${points.length}</b> 個航路點`;
-                } else {
-                    status.innerHTML = `⚠️ 找不到足夠的航路點座標`;
+                    camera.position.set(12000, 15000, 20000);
+                    camera.lookAt(0, 0, 0);
+
+                    function animate() {
+                        requestAnimationFrame(animate);
+                        renderer.render(scene, camera);
+                    }
+                    animate();
+
+                } catch (err) {
+                    console.error(err);
+                    container.innerHTML = `<div class="h-full flex items-center justify-center text-red-400 p-8">3D 渲染失敗<br>${err.message}</div>`;
+                    status.textContent = "❌ 3D 初始化錯誤";
                 }
-
-                camera.position.set(8000, 12000, 18000);
-                camera.lookAt(0, 0, 0);
-
-                function animate() {
-                    requestAnimationFrame(animate);
-                    if (pathLine) pathLine.rotation.y += 0.0008;
-                    renderer.render(scene, camera);
-                }
-                animate();
-
-            } catch (err) {
-                console.error(err);
-                container.innerHTML = `<div class="error-box m-4">3D 地圖載入失敗<br>${err.message}</div>`;
-                status.textContent = "❌ 3D 渲染錯誤";
-            }
+            }, 300);
         }
 
-        // ====================== 其他功能（簡化） ======================
+        // ====================== 其他功能 ======================
         function renderAllFlightFields(doc) {
             const container = document.getElementById("flightInfo");
             container.innerHTML = "";
@@ -253,15 +251,7 @@
                     const pos = point4d.querySelector("pos")?.textContent || "—";
                     const time = point4d.querySelector("absoluteTime, relativeTimeFromInitialPredictionPoint")?.textContent || "—";
 
-                    let wind = "";
-                    const met = point4d.querySelector("metData");
-                    if (met) {
-                        const dir = met.querySelector("windDirection")?.textContent;
-                        const spd = met.querySelector("windSpeed")?.textContent;
-                        if (dir && spd) wind = `<div>🌬️ ${dir}° / ${spd} m/s</div>`;
-                    }
-
-                    point4dHTML = `<div class="point4d"><strong>高度:</strong> ${levelText}<br><strong>時間:</strong> ${time}<br><strong>座標:</strong> ${pos}</div>${wind}`;
+                    point4dHTML = `<div class="point4d"><strong>高度:</strong> ${levelText}<br><strong>時間:</strong> ${time}<br><strong>座標:</strong> ${pos}</div>`;
                 }
 
                 const tr = document.createElement("tr");
