@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIXM / FF-ICE XML 檢視器（3D 航路圖）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; }
+        .tag { font-family: monospace; font-size: 0.75rem; color: #6b7280; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
+        .full-path { font-family: monospace; font-size: 0.78rem; color: #64748b; word-break: break-all; overflow-wrap: break-word; line-height: 1.35; }
+        .eobt-date { font-size: 1.45rem; font-weight: 700; color: #1f2937; }
+        .eobt-time { font-size: 1.2rem; color: #4f46e5; font-weight: 500; }
+        .duration-readable { font-size: 1.45rem; font-weight: 700; color: #4f46e5; }
+        .duration-original { font-size: 0.82rem; color: #6b7280; }
+        .field-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
+        #threeContainer { height: 520px; background: #0f172a; border-radius: 16px; overflow: hidden; border: 1px solid #334155; }
+    </style>
+</head>
+<body class="bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4">
+        <div class="bg-white rounded-3xl shadow-xl p-8">
+            <h1 class="text-3xl font-bold text-center mb-8 text-indigo-700">
+                FIXM / FF-ICE XML 檢視器（含 3D 航路圖）
+            </h1>
+
+            <div class="border-2 border-dashed border-indigo-300 rounded-2xl p-10 text-center mb-10 hover:border-indigo-500">
+                <input type="file" id="fileInput" accept=".xml" class="hidden" onchange="handleFile(this)">
+                <label for="fileInput" class="cursor-pointer">
+                    <div class="text-6xl mb-4">📤</div>
+                    <p class="text-xl font-medium">點擊上傳 FF-ICE XML 檔案</p>
+                </label>
+            </div>
+
+            <div id="result" class="hidden space-y-12">
+
+                <div id="headerInfo" class="bg-gradient-to-r from-indigo-50 to-blue-50 p-6 rounded-2xl"></div>
+
+                <div id="flightInfo" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+
+                <!-- 3D 地圖 -->
+                <div>
+                    <h2 class="text-2xl font-semibold mb-3">🌍 3D 航路圖</h2>
+                    <div id="threeContainer" class="w-full"></div>
+                    <p id="threeStatus" class="text-xs text-center mt-2 text-gray-500"></p>
+                </div>
+
+                <div>
+                    <h2 class="text-2xl font-semibold mb-4">🛫 航路元素</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm" id="routeTable">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="w-12">序號</th>
+                                    <th>起點</th>
+                                    <th>距離 (m)</th>
+                                    <th>航路設計</th>
+                                    <th class="w-80">Point4D 詳細資訊</th>
+                                </tr>
+                            </thead>
+                            <tbody id="routeBody" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-2xl font-semibold mb-4">🌳 完整 XML 樹狀結構</h2>
+                    <div id="xmlTree" class="bg-gray-900 text-gray-100 p-6 rounded-2xl text-sm overflow-auto max-h-[500px] font-mono border border-gray-700"></div>
+                </div>
+
+                <div class="text-center pt-6">
+                    <button onclick="resetPage()" class="px-8 py-3 bg-gray-200 hover:bg-gray-300 rounded-xl font-medium">
+                        上傳另一個檔案
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, pathLine;
+
+        function handleFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => parseFFICEXML(e.target.result);
+            reader.readAsText(file);
+        }
+
+        function parseFFICEXML(xmlText) {
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(xmlText, "text/xml");
+
+            let msgType = xml.querySelector("type, messageType")?.textContent || xml.documentElement.tagName || "Unknown";
+            document.getElementById("headerInfo").innerHTML = `
+                <div class="flex items-center gap-4">
+                    <span class="text-4xl">📋</span>
+                    <div>
+                        <div class="tag">FF-ICE Message</div>
+                        <div class="text-3xl font-bold text-indigo-700">${msgType}</div>
+                    </div>
+                </div>
+            `;
+
+            renderAllFlightFields(xml);
+            renderRouteTable(xml);
+            render3DPath(xml);
+            renderXMLTree(xml.documentElement, document.getElementById("xmlTree"));
+
+            document.getElementById("result").classList.remove("hidden");
+        }
+
+        // ====================== 3D 航路圖（加強防錯） ======================
+        function render3DPath(doc) {
+            const container = document.getElementById("threeContainer");
+            const status = document.getElementById("threeStatus");
+            container.innerHTML = "";
+
+            try {
+                scene = new THREE.Scene();
+                camera = new THREE.PerspectiveCamera(60, container.clientWidth / 520, 1, 20000);
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(container.clientWidth, 520);
+                container.appendChild(renderer.domElement);
+
+                // 地球
+                const earth = new THREE.Mesh(
+                    new THREE.SphereGeometry(6371, 48, 48),
+                    new THREE.MeshPhongMaterial({ color: 0x1e40af, shininess: 8 })
+                );
+                scene.add(earth);
+
+                scene.add(new THREE.AmbientLight(0x666666));
+                const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+                sun.position.set(10000, 10000, 10000);
+                scene.add(sun);
+
+                // 收集點位
+                const points = [];
+                doc.querySelectorAll("element").forEach(el => {
+                    const posNode = el.querySelector("pos");
+                    if (posNode) {
+                        const coords = posNode.textContent.trim().split(/\s+/).map(Number);
+                        if (coords.length === 2) {
+                            const [lat, lon] = coords;
+                            const alt = parseFloat(el.querySelector("altitude, flightLevel")?.textContent || 5000) / 1000;
+
+                            const phi = (90 - lat) * (Math.PI / 180);
+                            const theta = (lon + 180) * (Math.PI / 180);
+                            const r = 6371 + alt;
+
+                            points.push(new THREE.Vector3(
+                                r * Math.sin(phi) * Math.cos(theta),
+                                r * Math.cos(phi),
+                                r * Math.sin(phi) * Math.sin(theta)
+                            ));
+                        }
+                    }
+                });
+
+                if (points.length > 1) {
+                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    pathLine = new THREE.Line(geometry, new THREE.LineBasicMaterial({
+                        color: 0xffcc00,
+                        linewidth: 5
+                    }));
+                    scene.add(pathLine);
+                    status.textContent = `已繪製 ${points.length} 個航路點`;
+                } else {
+                    status.textContent = "⚠️ 無法找到足夠的航路點座標";
+                }
+
+                camera.position.set(12000, 15000, 20000);
+                camera.lookAt(0, 0, 0);
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    if (pathLine) pathLine.rotation.y += 0.0005;
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+            } catch (e) {
+                console.error(e);
+                container.innerHTML = `<div class="h-full flex items-center justify-center text-red-400">3D 渲染失敗<br>${e.message}</div>`;
+            }
+        }
+
+        // ====================== 其他功能（簡化版） ======================
+        function renderAllFlightFields(doc) {
+            const container = document.getElementById("flightInfo");
+            container.innerHTML = "";
+            const fields = collectAllFields(doc.documentElement);
+
+            fields.forEach(field => {
+                const div = document.createElement("div");
+                div.className = "bg-gray-50 p-6 rounded-2xl field-card";
+                let displayValue = field.value;
+                if (field.uom) displayValue += ` (${field.uom})`;
+
+                if (field.tag.toLowerCase().includes("estimatedoffblocktime")) {
+                    const datePart = field.value.split('T')[0];
+                    const timePart = field.value.split('T')[1]?.replace('Z', '') || '';
+                    div.innerHTML = `<div class="full-path">${field.fullPath}</div><div class="tag mt-1 mb-2">estimatedOffBlockTime</div><div class="text-sm text-gray-500">預計離場時間</div><div class="eobt-date mt-3">${datePart}</div><div class="eobt-time">${timePart} UTC</div><div class="duration-original mt-3">原始: ${field.value}</div>`;
+                } else if (field.tag.toLowerCase().includes("totalestimatedelapsedtime")) {
+                    const readable = formatDuration(field.value);
+                    div.innerHTML = `<div class="full-path">${field.fullPath}</div><div class="tag mt-1 mb-2">totalEstimatedElapsedTime</div><div class="text-sm text-gray-500">總飛行時間</div><div class="duration-readable mt-2">${readable}</div><div class="duration-original mt-1">原始: ${field.value}</div>`;
+                } else {
+                    const label = field.tag.replace(/([A-Z])/g, ' $1').trim();
+                    div.innerHTML = `<div class="full-path">${field.fullPath}</div><div class="tag mt-1 mb-2">${field.tag}</div><div class="text-sm text-gray-500">${label}</div><div class="mt-2 text-lg font-semibold">${displayValue}</div>`;
+                }
+                container.appendChild(div);
+            });
+        }
+
+        function collectAllFields(node, prefix = "", fields = []) {
+            if (!node || node.nodeType !== 1) return fields;
+            if (node.tagName === "routeTrajectoryGroup") return fields;
+
+            const currentPath = prefix ? `${prefix}/${node.tagName}` : node.tagName;
+
+            if (node.children.length === 0 && node.textContent.trim()) {
+                fields.push({
+                    tag: node.tagName,
+                    fullPath: currentPath,
+                    value: node.textContent.trim(),
+                    uom: node.getAttribute("uom")
+                });
+            } else {
+                Array.from(node.children).forEach(child => collectAllFields(child, currentPath, fields));
+            }
+            return fields;
+        }
+
+        function formatDuration(duration) {
+            const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+            if (!match) return duration;
+            const h = parseInt(match[1]||0), m = parseInt(match[2]||0), s = parseInt(match[3]||0);
+            let parts = [];
+            if (h > 0) parts.push(h);
+            if (m > 0 || h > 0) parts.push(m.toString().padStart(2,'0'));
+            if (s > 0 || m > 0 || h > 0) parts.push(s.toString().padStart(2,'0'));
+            return parts.join(':') || "00:00";
+        }
+
+        function renderRouteTable(doc) {
+            const tbody = document.getElementById("routeBody");
+            tbody.innerHTML = "";
+            const elements = doc.querySelectorAll("element");
+
+            elements.forEach(el => {
+                const seq = el.getAttribute("seqNum") || "—";
+                const dist = el.querySelector("alongRouteDistance")?.textContent || "—";
+                const designator = el.querySelector("routeDesignatorToNextElement > *")?.textContent || "—";
+                const pointValue = el.querySelector("locationIndicator, designator")?.textContent || "—";
+
+                let point4dHTML = "—";
+                const point4d = el.querySelector("point4D");
+                if (point4d) {
+                    const level = point4d.querySelector("altitude, flightLevel");
+                    const levelText = level ? `${level.textContent} ${level.getAttribute("uom") ? `(${level.getAttribute("uom")})` : ''}` : "—";
+                    const pos = point4d.querySelector("pos")?.textContent || "—";
+                    const time = point4d.querySelector("absoluteTime, relativeTimeFromInitialPredictionPoint")?.textContent || "—";
+
+                    let wind = "";
+                    const met = point4d.querySelector("metData");
+                    if (met) {
+                        const dir = met.querySelector("windDirection")?.textContent;
+                        const spd = met.querySelector("windSpeed")?.textContent;
+                        if (dir && spd) wind = `<div>🌬️ ${dir}° / ${spd} m/s</div>`;
+                    }
+
+                    point4dHTML = `<div class="point4d"><strong>高度:</strong> ${levelText}<br><strong>時間:</strong> ${time}<br><strong>座標:</strong> ${pos}</div>${wind}`;
+                }
+
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td>${seq}</td><td>${pointValue}</td><td>${dist}</td><td>${designator}</td><td>${point4dHTML}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderXMLTree(node, container) {
+            if (!container) return;
+            container.innerHTML = "";
+            container.appendChild(createTreeNode(node));
+        }
+
+        function createTreeNode(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                if (!node.textContent.trim()) return null;
+                const d = document.createElement("div");
+                d.className = "pl-6 text-emerald-400";
+                d.textContent = node.textContent.trim();
+                return d;
+            }
+            if (node.nodeType !== Node.ELEMENT_NODE) return null;
+
+            const details = document.createElement("details");
+            details.open = true;
+            const summary = document.createElement("summary");
+            summary.className = "flex items-center gap-2 text-blue-300 hover:text-blue-200";
+            let attrText = Array.from(node.attributes).map(a => ` ${a.name}="${a.value}"`).join("");
+            summary.innerHTML = `<span class="font-bold text-violet-300">&lt;${node.tagName}${attrText}&gt;</span>`;
+            details.appendChild(summary);
+
+            const childContainer = document.createElement("div");
+            childContainer.className = "border-l border-gray-700 pl-4 mt-1";
+            let hasChild = false;
+            node.childNodes.forEach(child => {
+                const c = createTreeNode(child);
+                if (c) {
+                    childContainer.appendChild(c);
+                    hasChild = true;
+                }
+            });
+            if (hasChild) details.appendChild(childContainer);
+            else if (node.textContent.trim()) {
+                const val = document.createElement("div");
+                val.className = "pl-6 text-emerald-400";
+                val.textContent = node.textContent.trim();
+                details.appendChild(val);
+            }
+            return details;
+        }
+
+        function resetPage() {
+            document.getElementById("result").classList.add("hidden");
+            document.getElementById("fileInput").value = "";
+        }
+    </script>
+</body>
+</html>
