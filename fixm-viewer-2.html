@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FIXM / FF-ICE XML 檢視器（3D 最終修正版）</title>
+    <title>FIXM / FF-ICE XML 檢視器（3D 軌道控制器）</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/controls/OrbitControls.js"></script>
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; }
         .tag { font-family: monospace; font-size: 0.75rem; color: #6b7280; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
@@ -15,15 +16,14 @@
         .duration-readable { font-size: 1.45rem; font-weight: 700; color: #4f46e5; }
         .duration-original { font-size: 0.82rem; color: #6b7280; }
         .field-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
-        #threeContainer { height: 520px; background: #0f172a; border-radius: 16px; overflow: hidden; border: 1px solid #334155; }
-        .point4d { font-size: 0.85rem; line-height: 1.45; }
+        #threeContainer { height: 560px; background: #0f172a; border-radius: 16px; overflow: hidden; border: 1px solid #334155; }
     </style>
 </head>
 <body class="bg-gray-50 py-8">
     <div class="max-w-7xl mx-auto px-4">
         <div class="bg-white rounded-3xl shadow-xl p-8">
             <h1 class="text-3xl font-bold text-center mb-8 text-indigo-700">
-                FIXM / FF-ICE XML 檢視器（3D 最終修正版）
+                FIXM / FF-ICE XML 檢視器（3D 軌道控制器）
             </h1>
 
             <div class="border-2 border-dashed border-indigo-300 rounded-2xl p-10 text-center mb-10 hover:border-indigo-500">
@@ -42,9 +42,10 @@
 
                 <!-- 3D 地圖 -->
                 <div>
-                    <h2 class="text-2xl font-semibold mb-3">🌍 3D 航路圖</h2>
+                    <h2 class="text-2xl font-semibold mb-3">🌍 3D 航路圖 
+                        <span class="text-sm font-normal text-gray-500">(滑鼠左鍵拖曳旋轉 • 右鍵平移 • 滾輪縮放)</span>
+                    </h2>
                     <div id="threeContainer"></div>
-                    <p id="threeStatus" class="text-center text-sm mt-2 text-emerald-600 font-medium"></p>
                 </div>
 
                 <div>
@@ -75,7 +76,7 @@
     </div>
 
     <script>
-        let scene, camera, renderer, pathLine;
+        let scene, camera, renderer, controls, pathLine;
 
         function handleFile(input) {
             const file = input.files[0];
@@ -108,32 +109,30 @@
             document.getElementById("result").classList.remove("hidden");
         }
 
-        // ====================== 3D 航路圖（強化版） ======================
+        // ====================== 3D 航路圖 + OrbitControls ======================
         function render3DPath(doc) {
             const container = document.getElementById("threeContainer");
-            const status = document.getElementById("threeStatus");
             container.innerHTML = `<div class="h-full flex items-center justify-center text-gray-400">初始化 3D 場景...</div>`;
 
             setTimeout(() => {
                 try {
                     scene = new THREE.Scene();
-                    camera = new THREE.PerspectiveCamera(60, container.clientWidth / 520, 1, 30000);
+                    camera = new THREE.PerspectiveCamera(60, container.clientWidth / 560, 1, 30000);
                     renderer = new THREE.WebGLRenderer({ antialias: true });
-                    renderer.setSize(container.clientWidth, 520);
+                    renderer.setSize(container.clientWidth, 560);
                     container.innerHTML = "";
                     container.appendChild(renderer.domElement);
 
-                    // 地球（更明顯）
+                    // 地球
                     const earth = new THREE.Mesh(
                         new THREE.SphereGeometry(6371, 64, 64),
-                        new THREE.MeshPhongMaterial({ color: 0x2563eb, shininess: 5 })
+                        new THREE.MeshPhongMaterial({ color: 0x1e40af, shininess: 5 })
                     );
                     scene.add(earth);
 
-                    // 光源
                     scene.add(new THREE.AmbientLight(0xaaaaaa));
-                    const sun = new THREE.DirectionalLight(0xffffff, 1.4);
-                    sun.position.set(15000, 10000, 10000);
+                    const sun = new THREE.DirectionalLight(0xffffff, 1.3);
+                    sun.position.set(15000, 12000, 10000);
                     scene.add(sun);
 
                     // 收集航路點
@@ -146,7 +145,7 @@
                                 const alt = parseFloat(el.querySelector("altitude, flightLevel")?.textContent || 5000) / 1000;
                                 const phi = (90 - lat) * (Math.PI / 180);
                                 const theta = (lon + 180) * (Math.PI / 180);
-                                const r = 6371 + Math.max(alt, 5);
+                                const r = 6371 + Math.max(alt, 10);
 
                                 points.push(new THREE.Vector3(
                                     r * Math.sin(phi) * Math.cos(theta),
@@ -159,34 +158,39 @@
 
                     if (points.length > 1) {
                         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                        pathLine = new THREE.Line(geometry, new THREE.LineBasicMaterial({
-                            color: 0xffee00,
-                            linewidth: 8
+                        pathLine = new THREE.Line(geometry, new THREE.LineBasicMaterial({ 
+                            color: 0xffee00, 
+                            linewidth: 8 
                         }));
                         scene.add(pathLine);
-                        status.innerHTML = `✅ 成功繪製 <b>${points.length}</b> 個航路點`;
-                    } else {
-                        status.textContent = "⚠️ 找不到航路點座標";
                     }
 
-                    camera.position.set(8000, 12000, 22000);
+                    camera.position.set(12000, 15000, 22000);
                     camera.lookAt(0, 0, 0);
+
+                    // === OrbitControls ===
+                    controls = new THREE.OrbitControls(camera, renderer.domElement);
+                    controls.enableDamping = true;
+                    controls.dampingFactor = 0.05;
+                    controls.minDistance = 8000;
+                    controls.maxDistance = 40000;
+                    controls.enablePan = true;
 
                     function animate() {
                         requestAnimationFrame(animate);
-                        if (pathLine) pathLine.rotation.y += 0.001;
+                        controls.update();
                         renderer.render(scene, camera);
                     }
                     animate();
 
                 } catch (e) {
                     console.error(e);
-                    container.innerHTML = `<div class="h-full flex items-center justify-center text-red-400">3D 渲染失敗<br>${e.message}</div>`;
+                    container.innerHTML = `<div class="h-full flex items-center justify-center text-red-400 p-8">3D 載入失敗<br>${e.message}</div>`;
                 }
-            }, 100);
+            }, 200);
         }
 
-        // ====================== 其他功能 ======================
+        // ====================== 其他功能（保持不變） ======================
         function renderAllFlightFields(doc) {
             const container = document.getElementById("flightInfo");
             container.innerHTML = "";
