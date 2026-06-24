@@ -157,7 +157,7 @@ def generate_html(df_b, df_s, dates, watch_list, last_day_data):
 </div>
 </body>
 </html>"""
-    with open("docs/top30_foreign_trade.html", "w", encoding="utf-8") as f: f.write(html)
+    with open("docs/index.html", "w", encoding="utf-8") as f: f.write(html)
     print("🎉 執行成功！已產生最新修正版 HTML 報表。")
 
 if __name__ == "__main__": fetch_and_process_data()
