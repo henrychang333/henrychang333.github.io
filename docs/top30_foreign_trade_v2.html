@@ -1,1 +1,515 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>外資買賣超排行</title>
+    <style>
+        body { font-family: "Microsoft JhengHei", sans-serif; background: #f4f6f9; padding: 16px; margin: 0; }
+        .main-container { max-width: 1550px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,.1); }
+        h1 { text-align:center; font-size:18px; margin:0 0 6px; }
+        .meta-info { text-align:center; color:#666; font-size:12px; margin-bottom:16px; line-height:1.6; }
+        .tables-wrapper { display:flex; gap:20px; }
+        .table-section { flex:1; min-width:0; }
+        .table-section h2 { text-align:center; padding:8px; color:#fff; border-radius:4px; margin:0 0 10px; font-size:14px; }
+        .sell-title { background:#2b9348; } .buy-title { background:#d62828; }
+        .top30-table { width:100%; border-collapse:collapse; font-size:12px; }
+        .top30-table th, .top30-table td { padding:5px 7px; text-align:center !important; border-bottom:1px solid #ddd; line-height:1.4; }
+        .sell-theme th { background:#38b000; color:#fff; }
+        .buy-theme  th { background:#e63946; color:#fff; }
+        .top30-table tbody tr:nth-child(even) { background:#f9f9f9; }
+        .top30-table tbody tr.highlight-row { background:#fff2a3 !important; font-weight:bold; }
+        .last-day-info { font-size:10px; color:#888; display:block; margin-top:1px; }
+        .price-cell { white-space:nowrap; min-width:60px; }
+        .price-val { font-weight:bold; color:#1a1a2e; font-size:13px; }
+        .price-na  { color:#aaa; font-size:11px; }
+        .stock-link { color:#0066cc; text-decoration:underline; cursor:pointer; font-weight:bold; }
+        .stock-link:hover { color:#003d99; }
 
+        /* ── Modal：縮小固定高度，避免超出視窗 ── */
+        #chartModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9999; align-items:center; justify-content:center; }
+        #chartModal.open { display:flex; }
+        #chartBox {
+            background:#fff; border-radius:10px; padding:16px;
+            width:580px; max-width:95vw;
+            max-height:92vh; overflow-y:auto;
+            box-shadow:0 8px 32px rgba(0,0,0,.25); position:relative;
+        }
+        #chartTitle { text-align:center; margin:0 0 3px; font-size:15px; color:#222; }
+        #chartSub   { text-align:center; margin:0 0 10px; font-size:11px; color:#999; }
+        #closeBtn   { position:absolute; top:8px; right:12px; font-size:20px; cursor:pointer; color:#666; background:none; border:none; }
+        #closeBtn:hover { color:#000; }
+        .legend-box { display:flex; justify-content:center; gap:16px; margin-top:8px; font-size:11px; color:#555; flex-wrap:wrap; }
+        .legend-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:3px; vertical-align:middle; }
+        #netAnn { text-align:center; margin:6px 0 0; font-size:12px; color:#555; }
+    </style>
+</head>
+<body>
+<div class="main-container">
+    <h1>📊 外資 5 日累積買賣超排行 (Top 30)</h1>
+    <div class="meta-info">
+        <strong>資料期間：</strong>2026/06/22 ~ 2026/06/26（共 5 個交易日）｜<strong>來源：</strong>TWSE API｜
+        <strong>更新：</strong>2026/06/26 21:57
+    </div>
+    <div class="tables-wrapper">
+        <div class="table-section">
+            <h2 class="sell-title">📉 外資賣超前 30 名</h2>
+            <table class="top30-table sell-theme">
+                <thead><tr><th>名次</th><th>代號</th><th>名稱</th><th>5日累積賣超股數</th><th>收盤價</th></tr></thead>
+                <tbody><tr ><td>第 1 名</td><td><span class='stock-link' data-code='3481' data-name='群創' data-hist='[{"date": "20260622", "price": 66.0, "net": -117423914}, {"date": "20260623", "price": 66.0, "net": -24432170}, {"date": "20260624", "price": 69.4, "net": -25214333}, {"date": "20260625", "price": 70.9, "net": 10243611}, {"date": "20260626", "price": 65.0, "net": -152253028}]' data-net='-309079834' onclick='showChart(this)'>3481</span></td><td>群創</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>309,079,834</strong><br>
+                <span class="last-day-info">(06/26 買:128,604,445/賣:280,857,473)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>65.00</span></td></tr><tr ><td>第 2 名</td><td><span class='stock-link' data-code='0050' data-name='元大台灣50' data-hist='[{"date": "20260622", "price": 111.15, "net": 878566}, {"date": "20260623", "price": 110.1, "net": -27630722}, {"date": "20260624", "price": 107.15, "net": -126206899}, {"date": "20260625", "price": 107.2, "net": -23490994}, {"date": "20260626", "price": 103.1, "net": -130305489}]' data-net='-306755538' onclick='showChart(this)'>0050</span></td><td>元大台灣50</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>306,755,538</strong><br>
+                <span class="last-day-info">(06/26 買:10,776,213/賣:141,081,702)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>103.10</span></td></tr><tr ><td>第 3 名</td><td><span class='stock-link' data-code='2344' data-name='華邦電' data-hist='[{"date": "20260622", "price": 222.0, "net": -103086815}, {"date": "20260623", "price": 211.5, "net": -25099509}, {"date": "20260624", "price": 205.0, "net": -51790233}, {"date": "20260625", "price": 219.5, "net": -16919451}, {"date": "20260626", "price": 206.5, "net": -18445690}]' data-net='-215341698' onclick='showChart(this)'>2344</span></td><td>華邦電</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>215,341,698</strong><br>
+                <span class="last-day-info">(06/26 買:71,658,653/賣:90,104,343)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>206.50</span></td></tr><tr ><td>第 4 名</td><td><span class='stock-link' data-code='00991A' data-name='主動復華未來50' data-hist='[{"date": "20260622", "price": 21.33, "net": -38895470}, {"date": "20260623", "price": 20.56, "net": -25935668}, {"date": "20260624", "price": 20.39, "net": -37168620}, {"date": "20260625", "price": 20.7, "net": 3682150}, {"date": "20260626", "price": 19.75, "net": -55425836}]' data-net='-153743444' onclick='showChart(this)'>00991A</span></td><td>主動復華未來50</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>153,743,444</strong><br>
+                <span class="last-day-info">(06/26 買:17,147,169/賣:72,573,005)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>19.75</span></td></tr><tr ><td>第 5 名</td><td><span class='stock-link' data-code='00403A' data-name='主動統一升級50' data-hist='[{"date": "20260622", "price": 11.38, "net": -32675491}, {"date": "20260623", "price": 11.1, "net": 6876869}, {"date": "20260624", "price": 11.04, "net": -12973844}, {"date": "20260625", "price": 11.11, "net": 44473300}, {"date": "20260626", "price": 10.56, "net": -149913497}]' data-net='-144212663' onclick='showChart(this)'>00403A</span></td><td>主動統一升級50</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>144,212,663</strong><br>
+                <span class="last-day-info">(06/26 買:55,920,803/賣:205,834,300)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>10.56</span></td></tr><tr ><td>第 6 名</td><td><span class='stock-link' data-code='2886' data-name='兆豐金' data-hist='[{"date": "20260622", "price": 44.75, "net": -37388242}, {"date": "20260623", "price": 45.2, "net": -27498720}, {"date": "20260624", "price": 44.55, "net": -40496692}, {"date": "20260625", "price": 46.65, "net": -26839049}, {"date": "20260626", "price": 46.15, "net": -5466200}]' data-net='-137688903' onclick='showChart(this)'>2886</span></td><td>兆豐金</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>137,688,903</strong><br>
+                <span class="last-day-info">(06/26 買:21,541,364/賣:27,007,564)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>46.15</span></td></tr><tr ><td>第 7 名</td><td><span class='stock-link' data-code='2409' data-name='友達' data-hist='[{"date": "20260622", "price": 30.95, "net": 5018084}, {"date": "20260623", "price": 29.05, "net": -28755809}, {"date": "20260624", "price": 30.5, "net": -43044546}, {"date": "20260625", "price": 30.4, "net": 2191233}, {"date": "20260626", "price": 27.95, "net": -60943790}]' data-net='-125534828' onclick='showChart(this)'>2409</span></td><td>友達</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>125,534,828</strong><br>
+                <span class="last-day-info">(06/26 買:72,173,099/賣:133,116,889)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>27.95</span></td></tr><tr ><td>第 8 名</td><td><span class='stock-link' data-code='00988A' data-name='主動統一全球創新' data-hist='[{"date": "20260622", "price": 23.73, "net": -18401749}, {"date": "20260623", "price": 22.91, "net": -11036107}, {"date": "20260624", "price": 22.53, "net": -33985008}, {"date": "20260625", "price": 23.07, "net": -1018335}, {"date": "20260626", "price": 21.92, "net": -46084787}]' data-net='-110525986' onclick='showChart(this)'>00988A</span></td><td>主動統一全球創新</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>110,525,986</strong><br>
+                <span class="last-day-info">(06/26 買:14,564,481/賣:60,649,268)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>21.92</span></td></tr><tr ><td>第 9 名</td><td><span class='stock-link' data-code='2884' data-name='玉山金' data-hist='[{"date": "20260622", "price": 35.8, "net": -7895955}, {"date": "20260623", "price": 35.8, "net": -6256316}, {"date": "20260624", "price": 35.0, "net": -37759620}, {"date": "20260625", "price": 35.45, "net": -30257446}, {"date": "20260626", "price": 34.55, "net": -17608559}]' data-net='-99777896' onclick='showChart(this)'>2884</span></td><td>玉山金</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>99,777,896</strong><br>
+                <span class="last-day-info">(06/26 買:12,110,406/賣:29,718,965)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>34.55</span></td></tr><tr ><td>第 10 名</td><td><span class='stock-link' data-code='2880' data-name='華南金' data-hist='[{"date": "20260622", "price": 37.6, "net": -18882094}, {"date": "20260623", "price": 37.55, "net": -20709086}, {"date": "20260624", "price": 37.0, "net": -29206914}, {"date": "20260625", "price": 38.0, "net": -17042840}, {"date": "20260626", "price": 36.9, "net": -7600329}]' data-net='-93441263' onclick='showChart(this)'>2880</span></td><td>華南金</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>93,441,263</strong><br>
+                <span class="last-day-info">(06/26 買:11,450,181/賣:19,050,510)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>36.90</span></td></tr><tr ><td>第 11 名</td><td><span class='stock-link' data-code='2317' data-name='鴻海' data-hist='[{"date": "20260622", "price": 268.5, "net": -14847166}, {"date": "20260623", "price": 259.5, "net": -32411798}, {"date": "20260624", "price": 256.0, "net": -11991005}, {"date": "20260625", "price": 257.5, "net": -2631772}, {"date": "20260626", "price": 248.5, "net": -30327761}]' data-net='-92209502' onclick='showChart(this)'>2317</span></td><td>鴻海</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>92,209,502</strong><br>
+                <span class="last-day-info">(06/26 買:23,040,625/賣:53,368,386)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>248.50</span></td></tr><tr ><td>第 12 名</td><td><span class='stock-link' data-code='4904' data-name='遠傳' data-hist='[{"date": "20260622", "price": 108.0, "net": -27348402}, {"date": "20260623", "price": 107.0, "net": -25806882}, {"date": "20260624", "price": 107.0, "net": -19983861}, {"date": "20260625", "price": 108.5, "net": -13058817}, {"date": "20260626", "price": 107.0, "net": -3866902}]' data-net='-90064864' onclick='showChart(this)'>4904</span></td><td>遠傳</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>90,064,864</strong><br>
+                <span class="last-day-info">(06/26 買:5,718,946/賣:9,585,848)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>107.00</span></td></tr><tr ><td>第 13 名</td><td><span class='stock-link' data-code='3231' data-name='緯創' data-hist='[{"date": "20260622", "price": 162.5, "net": -16561241}, {"date": "20260623", "price": 158.5, "net": -20306915}, {"date": "20260624", "price": 157.5, "net": -15326688}, {"date": "20260625", "price": 160.0, "net": -13679981}, {"date": "20260626", "price": 153.0, "net": -22367854}]' data-net='-88242679' onclick='showChart(this)'>3231</span></td><td>緯創</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>88,242,679</strong><br>
+                <span class="last-day-info">(06/26 買:6,375,058/賣:28,742,912)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>153.00</span></td></tr><tr ><td>第 14 名</td><td><span class='stock-link' data-code='00400A' data-name='主動國泰動能高息' data-hist='[{"date": "20260622", "price": 15.57, "net": -12419946}, {"date": "20260623", "price": 15.17, "net": -17646280}, {"date": "20260624", "price": 14.92, "net": -23598740}, {"date": "20260625", "price": 15.0, "net": -3102800}, {"date": "20260626", "price": 14.21, "net": -31060731}]' data-net='-87828497' onclick='showChart(this)'>00400A</span></td><td>主動國泰動能高息</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>87,828,497</strong><br>
+                <span class="last-day-info">(06/26 買:11,960,269/賣:43,021,000)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>14.21</span></td></tr><tr ><td>第 15 名</td><td><span class='stock-link' data-code='00405A' data-name='主動富邦台灣龍耀' data-hist='[{"date": "20260622", "price": 9.79, "net": -41538040}, {"date": "20260623", "price": 9.51, "net": -6465570}, {"date": "20260624", "price": 9.42, "net": 3561709}, {"date": "20260625", "price": 9.43, "net": 6719410}, {"date": "20260626", "price": 9.0, "net": -46210625}]' data-net='-83933116' onclick='showChart(this)'>00405A</span></td><td>主動富邦台灣龍耀</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>83,933,116</strong><br>
+                <span class="last-day-info">(06/26 買:11,879,375/賣:58,090,000)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>9.00</span></td></tr><tr ><td>第 16 名</td><td><span class='stock-link' data-code='00631L' data-name='元大台灣50正2' data-hist='[{"date": "20260622", "price": 41.32, "net": 11677132}, {"date": "20260623", "price": 40.2, "net": -24515159}, {"date": "20260624", "price": 38.08, "net": -45164799}, {"date": "20260625", "price": 38.16, "net": 2264690}, {"date": "20260626", "price": 35.26, "net": -14367038}]' data-net='-70105174' onclick='showChart(this)'>00631L</span></td><td>元大台灣50正2</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>70,105,174</strong><br>
+                <span class="last-day-info">(06/26 買:31,902,962/賣:46,270,000)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>35.26</span></td></tr><tr ><td>第 17 名</td><td><span class='stock-link' data-code='2324' data-name='仁寶' data-hist='[{"date": "20260622", "price": 37.5, "net": -24813052}, {"date": "20260623", "price": 36.55, "net": 3408253}, {"date": "20260624", "price": 37.9, "net": -7141316}, {"date": "20260625", "price": 36.85, "net": -17691267}, {"date": "20260626", "price": 34.8, "net": -16040413}]' data-net='-62277795' onclick='showChart(this)'>2324</span></td><td>仁寶</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>62,277,795</strong><br>
+                <span class="last-day-info">(06/26 買:26,491,708/賣:42,532,121)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>34.80</span></td></tr><tr ><td>第 18 名</td><td><span class='stock-link' data-code='2890' data-name='永豐金' data-hist='[{"date": "20260622", "price": 39.8, "net": -1129752}, {"date": "20260623", "price": 39.8, "net": -13711235}, {"date": "20260624", "price": 39.55, "net": -27646655}, {"date": "20260625", "price": 39.95, "net": -18369976}, {"date": "20260626", "price": 39.15, "net": 415717}]' data-net='-60441901' onclick='showChart(this)'>2890</span></td><td>永豐金</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>60,441,901</strong><br>
+                <span class="last-day-info">(06/26 買:28,205,299/賣:27,789,582)</span>
+            </div><div style='font-size:22px;color:#2b9348;font-weight:bold;margin-left:10px;line-height:1.1;text-align:center;'>⚠️<br><span style='font-size:10px;'>轉買</span></div>
+        </div></td><td class='price-cell'><span class='price-val'>39.15</span></td></tr><tr ><td>第 19 名</td><td><span class='stock-link' data-code='9904' data-name='寶成' data-hist='[{"date": "20260622", "price": 26.1, "net": -9028000}, {"date": "20260623", "price": 26.0, "net": -10350576}, {"date": "20260624", "price": 25.95, "net": -4049911}, {"date": "20260625", "price": 25.95, "net": -8839000}, {"date": "20260626", "price": 25.3, "net": -24806337}]' data-net='-57073824' onclick='showChart(this)'>9904</span></td><td>寶成</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>57,073,824</strong><br>
+                <span class="last-day-info">(06/26 買:3,439,138/賣:28,245,475)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>25.30</span></td></tr><tr ><td>第 20 名</td><td><span class='stock-link' data-code='1303' data-name='南亞' data-hist='[{"date": "20260622", "price": 152.5, "net": -5341770}, {"date": "20260623", "price": 154.5, "net": -16414621}, {"date": "20260624", "price": 156.0, "net": -19380665}, {"date": "20260625", "price": 155.0, "net": -6802796}, {"date": "20260626", "price": 148.0, "net": -1013815}]' data-net='-48953667' onclick='showChart(this)'>1303</span></td><td>南亞</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>48,953,667</strong><br>
+                <span class="last-day-info">(06/26 買:9,577,375/賣:10,591,190)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>148.00</span></td></tr><tr ><td>第 21 名</td><td><span class='stock-link' data-code='2312' data-name='金寶' data-hist='[{"date": "20260622", "price": 35.85, "net": 2607333}, {"date": "20260623", "price": 34.55, "net": -5875847}, {"date": "20260624", "price": 38.0, "net": 1195474}, {"date": "20260625", "price": 36.4, "net": -33120413}, {"date": "20260626", "price": 33.5, "net": -12506811}]' data-net='-47700264' onclick='showChart(this)'>2312</span></td><td>金寶</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>47,700,264</strong><br>
+                <span class="last-day-info">(06/26 買:9,882,270/賣:22,389,081)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>33.50</span></td></tr><tr ><td>第 22 名</td><td><span class='stock-link' data-code='2330' data-name='台積電' data-hist='[{"date": "20260622", "price": 2510.0, "net": 14361098}, {"date": "20260623", "price": 2490.0, "net": -2726298}, {"date": "20260624", "price": 2390.0, "net": -38450174}, {"date": "20260625", "price": 2390.0, "net": -6103672}, {"date": "20260626", "price": 2340.0, "net": -14281155}]' data-net='-47200201' onclick='showChart(this)'>2330</span></td><td>台積電</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>47,200,201</strong><br>
+                <span class="last-day-info">(06/26 買:22,676,018/賣:36,957,173)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>2,340.00</span></td></tr><tr ><td>第 23 名</td><td><span class='stock-link' data-code='1402' data-name='遠東新' data-hist='[{"date": "20260622", "price": 28.8, "net": -11916798}, {"date": "20260623", "price": 28.65, "net": -7748162}, {"date": "20260624", "price": 28.45, "net": -8600500}, {"date": "20260625", "price": 28.6, "net": -6008522}, {"date": "20260626", "price": 28.5, "net": -11792861}]' data-net='-46066843' onclick='showChart(this)'>1402</span></td><td>遠東新</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>46,066,843</strong><br>
+                <span class="last-day-info">(06/26 買:5,306,269/賣:17,099,130)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>28.50</span></td></tr><tr ><td>第 24 名</td><td><span class='stock-link' data-code='2892' data-name='第一金' data-hist='[{"date": "20260622", "price": 32.3, "net": -12555033}, {"date": "20260623", "price": 32.45, "net": -10133683}, {"date": "20260624", "price": 32.05, "net": -12371191}, {"date": "20260625", "price": 32.85, "net": 6023055}, {"date": "20260626", "price": 32.65, "net": -16829237}]' data-net='-45866089' onclick='showChart(this)'>2892</span></td><td>第一金</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>45,866,089</strong><br>
+                <span class="last-day-info">(06/26 買:12,926,217/賣:29,755,454)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>32.65</span></td></tr><tr ><td>第 25 名</td><td><span class='stock-link' data-code='2408' data-name='南亞科' data-hist='[{"date": "20260622", "price": 505.0, "net": 9625608}, {"date": "20260623", "price": 454.5, "net": -23554786}, {"date": "20260624", "price": 443.5, "net": -20242569}, {"date": "20260625", "price": 477.0, "net": -10245685}, {"date": "20260626", "price": 449.0, "net": -519501}]' data-net='-44936933' onclick='showChart(this)'>2408</span></td><td>南亞科</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>44,936,933</strong><br>
+                <span class="last-day-info">(06/26 買:45,186,416/賣:45,705,917)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>449.00</span></td></tr><tr ><td>第 26 名</td><td><span class='stock-link' data-code='6116' data-name='彩晶' data-hist='[{"date": "20260622", "price": 19.95, "net": -9031941}, {"date": "20260623", "price": 19.0, "net": -14393154}, {"date": "20260624", "price": 19.4, "net": 1811918}, {"date": "20260625", "price": 19.5, "net": -14464397}, {"date": "20260626", "price": 18.25, "net": -7791528}]' data-net='-43869102' onclick='showChart(this)'>6116</span></td><td>彩晶</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>43,869,102</strong><br>
+                <span class="last-day-info">(06/26 買:19,751,318/賣:27,542,846)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>18.25</span></td></tr><tr ><td>第 27 名</td><td><span class='stock-link' data-code='2845' data-name='遠東銀' data-hist='[{"date": "20260622", "price": 12.85, "net": -15070172}, {"date": "20260623", "price": 13.1, "net": -3916378}, {"date": "20260624", "price": 13.0, "net": -10513692}, {"date": "20260625", "price": 13.1, "net": -2631872}, {"date": "20260626", "price": 13.0, "net": -9810628}]' data-net='-41942742' onclick='showChart(this)'>2845</span></td><td>遠東銀</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>41,942,742</strong><br>
+                <span class="last-day-info">(06/26 買:3,206,912/賣:13,017,540)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>13.00</span></td></tr><tr ><td>第 28 名</td><td><span class='stock-link' data-code='5876' data-name='上海商銀' data-hist='[{"date": "20260622", "price": 41.45, "net": -16607180}, {"date": "20260623", "price": 41.8, "net": -8211080}, {"date": "20260624", "price": 41.55, "net": -5939795}, {"date": "20260625", "price": 42.0, "net": -3847228}, {"date": "20260626", "price": 42.4, "net": -6626025}]' data-net='-41231308' onclick='showChart(this)'>5876</span></td><td>上海商銀</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>41,231,308</strong><br>
+                <span class="last-day-info">(06/26 買:3,579,350/賣:10,205,375)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>42.40</span></td></tr><tr ><td>第 29 名</td><td><span class='stock-link' data-code='009816' data-name='凱基台灣TOP50' data-hist='[{"date": "20260622", "price": 16.17, "net": 3392692}, {"date": "20260623", "price": 15.97, "net": -11762085}, {"date": "20260624", "price": 15.56, "net": -25759455}, {"date": "20260625", "price": 15.59, "net": 6086465}, {"date": "20260626", "price": 15.0, "net": -12565393}]' data-net='-40607776' onclick='showChart(this)'>009816</span></td><td>凱基台灣TOP50</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>40,607,776</strong><br>
+                <span class="last-day-info">(06/26 買:30,018,818/賣:42,584,211)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>15.00</span></td></tr><tr ><td>第 30 名</td><td><span class='stock-link' data-code='2633' data-name='台灣高鐵' data-hist='[{"date": "20260622", "price": 25.95, "net": -9216428}, {"date": "20260623", "price": 25.75, "net": -8958830}, {"date": "20260624", "price": 25.95, "net": -3545000}, {"date": "20260625", "price": 26.25, "net": -6921596}, {"date": "20260626", "price": 26.05, "net": -11286018}]' data-net='-39927872' onclick='showChart(this)'>2633</span></td><td>台灣高鐵</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>39,927,872</strong><br>
+                <span class="last-day-info">(06/26 買:2,121,945/賣:13,407,963)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>26.05</span></td></tr></tbody>
+            </table>
+        </div>
+        <div class="table-section">
+            <h2 class="buy-title">📈 外資買超前 30 名</h2>
+            <table class="top30-table buy-theme">
+                <thead><tr><th>名次</th><th>代號</th><th>名稱</th><th>5日累積買超股數</th><th>收盤價</th></tr></thead>
+                <tbody><tr ><td>第 1 名</td><td><span class='stock-link' data-code='2610' data-name='華航' data-hist='[{"date": "20260622", "price": 21.8, "net": -4398318}, {"date": "20260623", "price": 22.3, "net": 33754552}, {"date": "20260624", "price": 23.25, "net": 61356527}, {"date": "20260625", "price": 24.2, "net": 52215807}, {"date": "20260626", "price": 23.2, "net": 3664355}]' data-net='146592923' onclick='showChart(this)'>2610</span></td><td>華航</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>146,592,923</strong><br>
+                <span class="last-day-info">(06/26 買:26,754,511/賣:23,090,156)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>23.20</span></td></tr><tr ><td>第 2 名</td><td><span class='stock-link' data-code='2449' data-name='京元電子' data-hist='[{"date": "20260622", "price": 339.0, "net": 20077034}, {"date": "20260623", "price": 329.5, "net": 31582066}, {"date": "20260624", "price": 333.5, "net": 3806129}, {"date": "20260625", "price": 334.5, "net": 7789679}, {"date": "20260626", "price": 308.0, "net": 2555286}]' data-net='65810194' onclick='showChart(this)'>2449</span></td><td>京元電子</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>65,810,194</strong><br>
+                <span class="last-day-info">(06/26 買:18,690,403/賣:16,135,117)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>308.00</span></td></tr><tr ><td>第 3 名</td><td><span class='stock-link' data-code='2834' data-name='臺企銀' data-hist='[{"date": "20260622", "price": 17.45, "net": 7766321}, {"date": "20260623", "price": 17.65, "net": 17362206}, {"date": "20260624", "price": 17.8, "net": 15294058}, {"date": "20260625", "price": 18.0, "net": 18512573}, {"date": "20260626", "price": 17.75, "net": -5816074}]' data-net='53119084' onclick='showChart(this)'>2834</span></td><td>臺企銀</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>53,119,084</strong><br>
+                <span class="last-day-info">(06/26 買:12,450,291/賣:18,266,365)</span>
+            </div><div style='font-size:22px;color:#e63946;font-weight:bold;margin-left:10px;line-height:1.1;text-align:center;'>⚠️<br><span style='font-size:10px;'>轉賣</span></div>
+        </div></td><td class='price-cell'><span class='price-val'>17.75</span></td></tr><tr ><td>第 4 名</td><td><span class='stock-link' data-code='2618' data-name='長榮航' data-hist='[{"date": "20260622", "price": 41.65, "net": -3077954}, {"date": "20260623", "price": 42.95, "net": 6699185}, {"date": "20260624", "price": 44.0, "net": 25400553}, {"date": "20260625", "price": 44.5, "net": 13423165}, {"date": "20260626", "price": 43.8, "net": 7122809}]' data-net='49567758' onclick='showChart(this)'>2618</span></td><td>長榮航</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>49,567,758</strong><br>
+                <span class="last-day-info">(06/26 買:22,139,140/賣:15,016,331)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>43.80</span></td></tr><tr ><td>第 5 名</td><td><span class='stock-link' data-code='1301' data-name='台塑' data-hist='[{"date": "20260622", "price": 52.4, "net": 16495001}, {"date": "20260623", "price": 49.55, "net": -5531611}, {"date": "20260624", "price": 54.5, "net": 20646302}, {"date": "20260625", "price": 58.0, "net": 39475499}, {"date": "20260626", "price": 52.2, "net": -23336273}]' data-net='47748918' onclick='showChart(this)'>1301</span></td><td>台塑</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>47,748,918</strong><br>
+                <span class="last-day-info">(06/26 買:10,205,281/賣:33,541,554)</span>
+            </div><div style='font-size:22px;color:#e63946;font-weight:bold;margin-left:10px;line-height:1.1;text-align:center;'>⚠️<br><span style='font-size:10px;'>轉賣</span></div>
+        </div></td><td class='price-cell'><span class='price-val'>52.20</span></td></tr><tr ><td>第 6 名</td><td><span class='stock-link' data-code='2801' data-name='彰銀' data-hist='[{"date": "20260622", "price": 22.85, "net": 4671479}, {"date": "20260623", "price": 23.2, "net": 18509700}, {"date": "20260624", "price": 22.9, "net": 458139}, {"date": "20260625", "price": 23.5, "net": 14683952}, {"date": "20260626", "price": 23.4, "net": 6698789}]' data-net='45022059' onclick='showChart(this)'>2801</span></td><td>彰銀</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>45,022,059</strong><br>
+                <span class="last-day-info">(06/26 買:15,419,230/賣:8,720,441)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>23.40</span></td></tr><tr ><td>第 7 名</td><td><span class='stock-link' data-code='00918' data-name='大華優利高填息30' data-hist='[{"date": "20260622", "price": 32.11, "net": 26262880}, {"date": "20260623", "price": 32.0, "net": 18680200}, {"date": "20260624", "price": 32.08, "net": 2254031}, {"date": "20260625", "price": 32.48, "net": 7289384}, {"date": "20260626", "price": 31.15, "net": -11536655}]' data-net='42949840' onclick='showChart(this)'>00918</span></td><td>大華優利高填息30</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>42,949,840</strong><br>
+                <span class="last-day-info">(06/26 買:5,751,545/賣:17,288,200)</span>
+            </div><div style='font-size:22px;color:#e63946;font-weight:bold;margin-left:10px;line-height:1.1;text-align:center;'>⚠️<br><span style='font-size:10px;'>轉賣</span></div>
+        </div></td><td class='price-cell'><span class='price-val'>31.15</span></td></tr><tr ><td>第 8 名</td><td><span class='stock-link' data-code='2887' data-name='台新新光金' data-hist='[{"date": "20260622", "price": 32.05, "net": 13106161}, {"date": "20260623", "price": 32.15, "net": 20638967}, {"date": "20260624", "price": 31.6, "net": -11518342}, {"date": "20260625", "price": 31.85, "net": 10396910}, {"date": "20260626", "price": 31.9, "net": 7635841}]' data-net='40259537' onclick='showChart(this)'>2887</span></td><td>台新新光金</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>40,259,537</strong><br>
+                <span class="last-day-info">(06/26 買:35,740,901/賣:28,105,060)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>31.90</span></td></tr><tr ><td>第 9 名</td><td><span class='stock-link' data-code='3711' data-name='日月光投控' data-hist='[{"date": "20260622", "price": 674.0, "net": 15662506}, {"date": "20260623", "price": 662.0, "net": 10811189}, {"date": "20260624", "price": 653.0, "net": 2322476}, {"date": "20260625", "price": 641.0, "net": 235471}, {"date": "20260626", "price": 632.0, "net": 6482590}]' data-net='35514232' onclick='showChart(this)'>3711</span></td><td>日月光投控</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>35,514,232</strong><br>
+                <span class="last-day-info">(06/26 買:26,201,687/賣:19,719,097)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>632.00</span></td></tr><tr ><td>第 10 名</td><td><span class='stock-link' data-code='5880' data-name='合庫金' data-hist='[{"date": "20260622", "price": 24.45, "net": -5832786}, {"date": "20260623", "price": 24.55, "net": 11118599}, {"date": "20260624", "price": 24.4, "net": 2563119}, {"date": "20260625", "price": 25.1, "net": 23417883}, {"date": "20260626", "price": 24.7, "net": 837407}]' data-net='32104222' onclick='showChart(this)'>5880</span></td><td>合庫金</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>32,104,222</strong><br>
+                <span class="last-day-info">(06/26 買:10,311,874/賣:9,474,467)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>24.70</span></td></tr><tr ><td>第 11 名</td><td><span class='stock-link' data-code='2002' data-name='中鋼' data-hist='[{"date": "20260622", "price": 19.5, "net": 44581757}, {"date": "20260623", "price": 19.2, "net": -20144480}, {"date": "20260624", "price": 19.35, "net": 14041692}, {"date": "20260625", "price": 19.05, "net": -9129577}, {"date": "20260626", "price": 19.0, "net": 2636233}]' data-net='31985625' onclick='showChart(this)'>2002</span></td><td>中鋼</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>31,985,625</strong><br>
+                <span class="last-day-info">(06/26 買:28,999,779/賣:26,363,546)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>19.00</span></td></tr><tr ><td>第 12 名</td><td><span class='stock-link' data-code='1314' data-name='中石化' data-hist='[{"date": "20260622", "price": 8.04, "net": 17463686}, {"date": "20260623", "price": 7.85, "net": -8242651}, {"date": "20260624", "price": 7.99, "net": 6079266}, {"date": "20260625", "price": 8.04, "net": 9485018}, {"date": "20260626", "price": 7.97, "net": 5609167}]' data-net='30394486' onclick='showChart(this)'>1314</span></td><td>中石化</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>30,394,486</strong><br>
+                <span class="last-day-info">(06/26 買:13,009,596/賣:7,400,429)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>7.97</span></td></tr><tr ><td>第 13 名</td><td><span class='stock-link' data-code='2006' data-name='東和鋼鐵' data-hist='[{"date": "20260622", "price": 69.6, "net": 6399395}, {"date": "20260623", "price": 69.7, "net": 7164362}, {"date": "20260624", "price": 69.8, "net": 7741337}, {"date": "20260625", "price": 70.0, "net": 6427654}, {"date": "20260626", "price": 69.8, "net": 1493095}]' data-net='29225843' onclick='showChart(this)'>2006</span></td><td>東和鋼鐵</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>29,225,843</strong><br>
+                <span class="last-day-info">(06/26 買:3,648,110/賣:2,155,015)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>69.80</span></td></tr><tr ><td>第 14 名</td><td><span class='stock-link' data-code='00712' data-name='復華富時不動產' data-hist='[{"date": "20260622", "price": 8.57, "net": 9216}, {"date": "20260623", "price": 8.53, "net": -5411600}, {"date": "20260624", "price": 8.6, "net": 10131100}, {"date": "20260625", "price": 8.6, "net": -44000}, {"date": "20260626", "price": 8.63, "net": 21948000}]' data-net='26632716' onclick='showChart(this)'>00712</span></td><td>復華富時不動產</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>26,632,716</strong><br>
+                <span class="last-day-info">(06/26 買:22,011,000/賣:63,000)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>8.63</span></td></tr><tr ><td>第 15 名</td><td><span class='stock-link' data-code='6213' data-name='聯茂' data-hist='[{"date": "20260622", "price": 308.0, "net": 13114162}, {"date": "20260623", "price": 281.0, "net": -86246}, {"date": "20260624", "price": 309.0, "net": 3765337}, {"date": "20260625", "price": 339.5, "net": 3956597}, {"date": "20260626", "price": 346.5, "net": 3832732}]' data-net='24582582' onclick='showChart(this)'>6213</span></td><td>聯茂</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>24,582,582</strong><br>
+                <span class="last-day-info">(06/26 買:15,888,345/賣:12,055,613)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>346.50</span></td></tr><tr ><td>第 16 名</td><td><span class='stock-link' data-code='8046' data-name='南電' data-hist='[{"date": "20260622", "price": 864.0, "net": -2620417}, {"date": "20260623", "price": 909.0, "net": 11482025}, {"date": "20260624", "price": 955.0, "net": 3229117}, {"date": "20260625", "price": 1045.0, "net": 4302579}, {"date": "20260626", "price": 1125.0, "net": 3130115}]' data-net='19523419' onclick='showChart(this)'>8046</span></td><td>南電</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>19,523,419</strong><br>
+                <span class="last-day-info">(06/26 買:10,591,858/賣:7,461,743)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>1,125.00</span></td></tr><tr ><td>第 17 名</td><td><span class='stock-link' data-code='2353' data-name='宏碁' data-hist='[{"date": "20260622", "price": 34.0, "net": -1980106}, {"date": "20260623", "price": 33.4, "net": 11075304}, {"date": "20260624", "price": 34.2, "net": 3344697}, {"date": "20260625", "price": 33.8, "net": -411699}, {"date": "20260626", "price": 31.9, "net": 7429367}]' data-net='19457563' onclick='showChart(this)'>2353</span></td><td>宏碁</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>19,457,563</strong><br>
+                <span class="last-day-info">(06/26 買:16,342,340/賣:8,912,973)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>31.90</span></td></tr><tr ><td>第 18 名</td><td><span class='stock-link' data-code='2883' data-name='凱基金' data-hist='[{"date": "20260622", "price": 30.35, "net": 15256888}, {"date": "20260623", "price": 30.1, "net": 23429454}, {"date": "20260624", "price": 29.8, "net": -24433627}, {"date": "20260625", "price": 30.5, "net": 6187957}, {"date": "20260626", "price": 29.9, "net": -1535416}]' data-net='18905256' onclick='showChart(this)'>2883</span></td><td>凱基金</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>18,905,256</strong><br>
+                <span class="last-day-info">(06/26 買:39,364,095/賣:40,899,511)</span>
+            </div><div style='font-size:22px;color:#e63946;font-weight:bold;margin-left:10px;line-height:1.1;text-align:center;'>⚠️<br><span style='font-size:10px;'>轉賣</span></div>
+        </div></td><td class='price-cell'><span class='price-val'>29.90</span></td></tr><tr ><td>第 19 名</td><td><span class='stock-link' data-code='2303' data-name='聯電' data-hist='[{"date": "20260622", "price": 160.0, "net": -11971079}, {"date": "20260623", "price": 170.0, "net": 27579714}, {"date": "20260624", "price": 178.0, "net": 7332865}, {"date": "20260625", "price": 178.5, "net": 11768117}, {"date": "20260626", "price": 164.0, "net": -16701027}]' data-net='18008590' onclick='showChart(this)'>2303</span></td><td>聯電</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>18,008,590</strong><br>
+                <span class="last-day-info">(06/26 買:108,120,219/賣:124,821,246)</span>
+            </div><div style='font-size:22px;color:#e63946;font-weight:bold;margin-left:10px;line-height:1.1;text-align:center;'>⚠️<br><span style='font-size:10px;'>轉賣</span></div>
+        </div></td><td class='price-cell'><span class='price-val'>164.00</span></td></tr><tr ><td>第 20 名</td><td><span class='stock-link' data-code='2885' data-name='元大金' data-hist='[{"date": "20260622", "price": 68.8, "net": 4160920}, {"date": "20260623", "price": 68.3, "net": 1505108}, {"date": "20260624", "price": 66.1, "net": -8355350}, {"date": "20260625", "price": 66.7, "net": 12080594}, {"date": "20260626", "price": 66.3, "net": 7330720}]' data-net='16721992' onclick='showChart(this)'>2885</span></td><td>元大金</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>16,721,992</strong><br>
+                <span class="last-day-info">(06/26 買:20,454,326/賣:13,123,606)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>66.30</span></td></tr><tr ><td>第 21 名</td><td><span class='stock-link' data-code='2337' data-name='旺宏' data-hist='[{"date": "20260622", "price": 185.5, "net": 13872314}, {"date": "20260623", "price": 172.0, "net": 1695028}, {"date": "20260624", "price": 172.0, "net": -2129268}, {"date": "20260625", "price": 161.5, "net": -54162831}, {"date": "20260626", "price": 162.5, "net": 57327341}]' data-net='16602584' onclick='showChart(this)'>2337</span></td><td>旺宏</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>16,602,584</strong><br>
+                <span class="last-day-info">(06/26 買:99,038,413/賣:41,711,072)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>162.50</span></td></tr><tr ><td>第 22 名</td><td><span class='stock-link' data-code='2812' data-name='台中銀' data-hist='[{"date": "20260622", "price": 19.65, "net": -5005000}, {"date": "20260623", "price": 20.0, "net": 11991457}, {"date": "20260624", "price": 19.85, "net": 869789}, {"date": "20260625", "price": 20.05, "net": 7521240}, {"date": "20260626", "price": 19.8, "net": 446000}]' data-net='15823486' onclick='showChart(this)'>2812</span></td><td>台中銀</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>15,823,486</strong><br>
+                <span class="last-day-info">(06/26 買:5,801,000/賣:5,355,000)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>19.80</span></td></tr><tr ><td>第 23 名</td><td><span class='stock-link' data-code='1319' data-name='東陽' data-hist='[{"date": "20260622", "price": 84.8, "net": 1704050}, {"date": "20260623", "price": 79.4, "net": 4922040}, {"date": "20260624", "price": 79.5, "net": 5723260}, {"date": "20260625", "price": 79.6, "net": 3127595}, {"date": "20260626", "price": 77.3, "net": -169700}]' data-net='15307245' onclick='showChart(this)'>1319</span></td><td>東陽</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>15,307,245</strong><br>
+                <span class="last-day-info">(06/26 買:1,850,300/賣:2,020,000)</span>
+            </div><div style='font-size:22px;color:#e63946;font-weight:bold;margin-left:10px;line-height:1.1;text-align:center;'>⚠️<br><span style='font-size:10px;'>轉賣</span></div>
+        </div></td><td class='price-cell'><span class='price-val'>77.30</span></td></tr><tr ><td>第 24 名</td><td><span class='stock-link' data-code='2369' data-name='菱生' data-hist='[{"date": "20260622", "price": 40.5, "net": 8750432}, {"date": "20260623", "price": 44.55, "net": 5916463}, {"date": "20260624", "price": 43.3, "net": 4288173}, {"date": "20260625", "price": 43.4, "net": -2171920}, {"date": "20260626", "price": 40.95, "net": -2229416}]' data-net='14553732' onclick='showChart(this)'>2369</span></td><td>菱生</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>14,553,732</strong><br>
+                <span class="last-day-info">(06/26 買:12,954,684/賣:15,184,100)</span>
+            </div><div style='font-size:22px;color:#e63946;font-weight:bold;margin-left:10px;line-height:1.1;text-align:center;'>⚠️<br><span style='font-size:10px;'>轉賣</span></div>
+        </div></td><td class='price-cell'><span class='price-val'>40.95</span></td></tr><tr ><td>第 25 名</td><td><span class='stock-link' data-code='6176' data-name='瑞儀' data-hist='[{"date": "20260622", "price": 90.2, "net": 4383372}, {"date": "20260623", "price": 90.0, "net": 3221650}, {"date": "20260624", "price": 90.2, "net": 4710985}, {"date": "20260625", "price": 90.7, "net": 4553006}, {"date": "20260626", "price": 87.7, "net": -2377432}]' data-net='14491581' onclick='showChart(this)'>6176</span></td><td>瑞儀</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>14,491,581</strong><br>
+                <span class="last-day-info">(06/26 買:2,227,850/賣:4,605,282)</span>
+            </div><div style='font-size:22px;color:#e63946;font-weight:bold;margin-left:10px;line-height:1.1;text-align:center;'>⚠️<br><span style='font-size:10px;'>轉賣</span></div>
+        </div></td><td class='price-cell'><span class='price-val'>87.70</span></td></tr><tr ><td>第 26 名</td><td><span class='stock-link' data-code='009805' data-name='新光美國電力基建' data-hist='[{"date": "20260622", "price": 16.91, "net": 1883000}, {"date": "20260623", "price": 17.18, "net": 4043000}, {"date": "20260624", "price": 16.82, "net": 2245500}, {"date": "20260625", "price": 17.14, "net": 1737000}, {"date": "20260626", "price": 17.05, "net": 4291000}]' data-net='14199500' onclick='showChart(this)'>009805</span></td><td>新光美國電力基建</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>14,199,500</strong><br>
+                <span class="last-day-info">(06/26 買:4,749,000/賣:458,000)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>17.05</span></td></tr><tr ><td>第 27 名</td><td><span class='stock-link' data-code='1714' data-name='和桐' data-hist='[{"date": "20260622", "price": 18.35, "net": 48194}, {"date": "20260623", "price": 17.85, "net": 4858230}, {"date": "20260624", "price": 19.05, "net": 3383568}, {"date": "20260625", "price": 18.5, "net": 2691485}, {"date": "20260626", "price": 18.55, "net": 1711372}]' data-net='12692849' onclick='showChart(this)'>1714</span></td><td>和桐</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>12,692,849</strong><br>
+                <span class="last-day-info">(06/26 買:2,408,372/賣:697,000)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>18.55</span></td></tr><tr ><td>第 28 名</td><td><span class='stock-link' data-code='8150' data-name='南茂' data-hist='[{"date": "20260622", "price": 114.0, "net": 8686355}, {"date": "20260623", "price": 106.5, "net": 11950464}, {"date": "20260624", "price": 103.0, "net": -6239134}, {"date": "20260625", "price": 96.0, "net": -21119166}, {"date": "20260626", "price": 97.5, "net": 18340964}]' data-net='11619483' onclick='showChart(this)'>8150</span></td><td>南茂</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>11,619,483</strong><br>
+                <span class="last-day-info">(06/26 買:34,211,200/賣:15,870,236)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>97.50</span></td></tr><tr ><td>第 29 名</td><td><span class='stock-link' data-code='00994A' data-name='主動第一金台股優' data-hist='[{"date": "20260622", "price": 18.52, "net": 8422060}, {"date": "20260623", "price": 18.07, "net": 3163383}, {"date": "20260624", "price": 17.94, "net": -453094}, {"date": "20260625", "price": 18.02, "net": 1449508}, {"date": "20260626", "price": 17.2, "net": -1587000}]' data-net='10994857' onclick='showChart(this)'>00994A</span></td><td>主動第一金台股優</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>10,994,857</strong><br>
+                <span class="last-day-info">(06/26 買:1,145,000/賣:2,732,000)</span>
+            </div><div style='font-size:22px;color:#e63946;font-weight:bold;margin-left:10px;line-height:1.1;text-align:center;'>⚠️<br><span style='font-size:10px;'>轉賣</span></div>
+        </div></td><td class='price-cell'><span class='price-val'>17.20</span></td></tr><tr ><td>第 30 名</td><td><span class='stock-link' data-code='2426' data-name='鼎元' data-hist='[{"date": "20260622", "price": 89.9, "net": 9444754}, {"date": "20260623", "price": 94.7, "net": 6989796}, {"date": "20260624", "price": 93.3, "net": -2074315}, {"date": "20260625", "price": 85.1, "net": -4814898}, {"date": "20260626", "price": 77.6, "net": 1279410}]' data-net='10824747' onclick='showChart(this)'>2426</span></td><td>鼎元</td><td><div style='display:flex;align-items:center;justify-content:center;padding:2px 0;'>
+            <div style='text-align:left;'>
+                <strong style='font-size:14px;'>10,824,747</strong><br>
+                <span class="last-day-info">(06/26 買:6,107,910/賣:4,828,500)</span>
+            </div>
+        </div></td><td class='price-cell'><span class='price-val'>77.60</span></td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ── Chart Modal ───────────────────────────── -->
+<div id="chartModal">
+  <div id="chartBox">
+    <button id="closeBtn" onclick="closeChart()">✕</button>
+    <h3 id="chartTitle"></h3>
+    <p id="chartSub">實線＝收盤價（左軸）｜虛線＝外資淨買賣超（右軸，紅＝買超 綠＝賣超）</p>
+    <canvas id="priceChart" height="260"></canvas>
+    <div class="legend-box">
+      <span><span class="legend-dot" style="background:#0066cc;"></span>收盤價（左軸）</span>
+      <span><span class="legend-dot" style="background:#d62828;"></span>外資買超（右軸）</span>
+      <span><span class="legend-dot" style="background:#2b9348;"></span>外資賣超（右軸）</span>
+    </div>
+    <p id="netAnn"></p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+let chartInst = null;
+
+function pointColors(nets) {
+  return nets.map(v => v == null ? 'transparent'
+                     : v >= 0   ? 'rgba(214,40,40,0.8)'
+                                : 'rgba(43,147,72,0.8)');
+}
+
+function showChart(el) {
+  const code     = el.dataset.code;
+  const name     = el.dataset.name;
+  const hist     = JSON.parse(el.dataset.hist);  // [{date,price,net},...]
+  const netTotal = parseInt(el.dataset.net, 10);
+
+  if (!hist || hist.length === 0) { alert(code + ' 暫無資料'); return; }
+
+  const labels = hist.map(h => h.date.slice(4,6)+'/'+h.date.slice(6,8));
+  const prices = hist.map(h => h.price);
+  const nets   = hist.map(h => h.net || 0);
+  const ptColors = pointColors(nets);
+
+  document.getElementById('chartTitle').textContent = code + ' ' + name + ' ── 近 5 日';
+
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  if (chartInst) chartInst.destroy();
+
+  chartInst = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'line',
+          label: '收盤價 (元)',
+          data: prices,
+          borderColor: '#0066cc',
+          backgroundColor: 'rgba(0,102,204,.07)',
+          tension: 0.3,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: '#0066cc',
+          borderWidth: 2.5,
+          spanGaps: true,
+          fill: true,
+          yAxisID: 'yP',
+          order: 1
+        },
+        {
+          type: 'line',
+          label: '外資淨買賣超 (股)',
+          data: nets,
+          borderColor: ctx => {
+            const v = nets[ctx.dataIndex];
+            return v >= 0 ? 'rgba(214,40,40,0.9)' : 'rgba(43,147,72,0.9)';
+          },
+          segment: {
+            borderColor: ctx => {
+              const v = nets[ctx.p1DataIndex];
+              return v >= 0 ? 'rgba(214,40,40,0.85)' : 'rgba(43,147,72,0.85)';
+            }
+          },
+          backgroundColor: 'transparent',
+          borderDash: [5, 3],
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: ptColors,
+          spanGaps: true,
+          yAxisID: 'yN',
+          order: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              if (ctx.dataset.yAxisID === 'yP')
+                return ctx.parsed.y != null ? ' 收盤價：' + ctx.parsed.y.toFixed(2) + ' 元' : ' 收盤價：無資料';
+              const v = ctx.parsed.y;
+              return ' 外資' + (v >= 0 ? '買超' : '賣超') + '：' + Math.abs(v).toLocaleString() + ' 股';
+            }
+          }
+        }
+      },
+      scales: {
+        yP: {
+          type: 'linear', position: 'left',
+          title: { display: true, text: '收盤價 (元)', color: '#0066cc', font: { size: 11 } },
+          ticks: { color: '#0066cc', font: { size: 10 } },
+          grid: { color: 'rgba(0,102,204,.07)' }
+        },
+        yN: {
+          type: 'linear', position: 'right',
+          title: { display: true, text: '外資淨買賣超 (股)', color: '#888', font: { size: 11 } },
+          ticks: {
+            color: '#888', font: { size: 10 },
+            callback: v => (v >= 0 ? '+' : '') + v.toLocaleString()
+          },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  });
+
+  const sign   = netTotal >= 0 ? '📈 買超' : '📉 賣超';
+  const absNet = Math.abs(netTotal).toLocaleString();
+  document.getElementById('netAnn').innerHTML =
+    '5 日累積外資 ' + sign + ' <strong>' + absNet + '</strong> 股';
+
+  document.getElementById('chartModal').classList.add('open');
+}
+
+function closeChart() {
+  document.getElementById('chartModal').classList.remove('open');
+}
+
+document.getElementById('chartModal').addEventListener('click', function(e) {
+  if (e.target === this) closeChart();
+});
+</script>
+</body>
+</html>
