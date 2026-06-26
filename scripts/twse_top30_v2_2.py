@@ -511,7 +511,7 @@ document.getElementById('chartModal').addEventListener('click', function(e) {{
 </body>
 </html>"""
 
-    with open("top30_foreign_trade.html", "w", encoding="utf-8") as f:
+    with open("docs/top30_foreign_trade_v2.html", "w", encoding="utf-8") as f:
         f.write(html)
     print("🎉 完成！HTML 報表已產生（全 TWSE API，雙折線圖，縮小版 Modal）。")
 
