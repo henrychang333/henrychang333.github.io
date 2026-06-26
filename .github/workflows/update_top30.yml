@@ -31,7 +31,7 @@ jobs:
 
     - name: Run script
       run: |
-        python scripts/twse_top30.py
+        python scripts/twse_top30_v2_2.py
 
     - name: Commit changes
       run: |
