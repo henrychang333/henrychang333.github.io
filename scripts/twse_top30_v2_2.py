@@ -345,7 +345,7 @@ def generate_html(df_b, df_s, dates, watch_list, last_day_data, latest_close, pr
     <h1>📊 外資 5 日累積買賣超排行 (Top 30)</h1>
     <div class="meta-info">
         <strong>資料期間：</strong>{range_str}（共 5 個交易日）｜<strong>來源：</strong>TWSE API｜
-        <strong>更新：</strong>{datetime.now().strftime('%Y/%m/%d %H:%M') <strong>(UTC)</strong>}
+        <strong>更新：</strong>{datetime.now().strftime('%Y/%m/%d %H:%M') } <strong>(UTC)</strong>
     </div>
     <div class="tables-wrapper">
         <div class="table-section">
