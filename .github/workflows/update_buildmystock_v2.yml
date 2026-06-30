@@ -1,0 +1,38 @@
+name: Auto Update Stock HTML
+
+on:
+  schedule:
+    # 國際標準時間 (UTC) 每日 08:30，即台灣時間 (UTC+8) 每日下午 16:00-17:30 執行
+    - cron: '0,30 8-9 * * 1-5'
+  workflow_dispatch: # 允許手動點擊觸發
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 賦予推回程式碼的權限
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests zoneinfo
+
+    - name: Run script to build HTML
+      run: python buildmystock_v2.py
+
+    - name: Commit and Push changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add docs/output.html
+        git diff-index --quiet HEAD || git commit -m "Auto-updated stock charts"
+        git push
