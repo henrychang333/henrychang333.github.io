@@ -27,7 +27,7 @@ jobs:
         pip install requests zoneinfo
 
     - name: Run script to build HTML
-      run: python buildmystock_v2.py
+      run: python scripts/buildmystock_v2.py
 
     - name: Commit and Push changes
       run: |
