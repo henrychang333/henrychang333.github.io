@@ -28,6 +28,10 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+
 
 ROOT = Path(__file__).resolve().parents[1]
 WATCH_FILE = ROOT / "watch.txt"
@@ -265,9 +269,18 @@ def fetch_foreign_for_dates(
             row.foreign_missing = True
             continue
 
-        row.foreign_buy = parse_int(target[9])
-        row.foreign_sell = parse_int(target[10])
-        row.foreign_net = parse_int(target[11])
+        if len(target) >= 12:
+            # 12 欄位格式：合計值位於索引 9, 10, 11
+            row.foreign_buy = parse_int(target[9])
+            row.foreign_sell = parse_int(target[10])
+            row.foreign_net = parse_int(target[11])
+        elif len(target) >= 5:
+            # 5 欄位格式：買進、賣出、買賣超位於索引 2, 3, 4
+            row.foreign_buy = parse_int(target[2])
+            row.foreign_sell = parse_int(target[3])
+            row.foreign_net = parse_int(target[4])
+        else:
+            row.foreign_missing = True
 
 
 def rolling_sum(values: list[int], index: int, window: int, min_periods: int) -> int | None:
