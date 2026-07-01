@@ -13,15 +13,19 @@ jobs:
       contents: write # 賦予推回程式碼的權限
 
     steps:
+    - name: Get current date and week
+      id: date
+      run: |
+        echo "year=$(date +'%Y')" >> $GITHUB_OUTPUT
+        echo "week=$(date +'%V')" >> $GITHUB_OUTPUT
+    
     - name: Setup TWSE Cache
       uses: actions/cache@v4
       with:
         path: .cache/twse/
-        # 使用當前年分與週次作為 key（例如 twse-cache-2026-w27）
-        # 這樣每週會自動建立新快取，同時避免快取無限膨脹
-        key: twse-cache-${{ clock.year }}-w${{ clock.week }}
+        key: twse-cache-${{ steps.date.outputs.year }}-w${{ steps.date.outputs.week }}
         restore-keys: |
-          twse-cache-${{ clock.year }}-
+          twse-cache-${{ steps.date.outputs.year }}-
           twse-cache-
     
     - name: Checkout repository
