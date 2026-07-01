@@ -199,15 +199,23 @@ def fetch_prices(
 ) -> list[DailyRow]:
     rows: list[DailyRow] = []
     stock_name = ""
+    today_str = date.today().strftime("%Y%m%d")
+    current_month_str = date.today().strftime("%Y%m")
 
     for month_start in month_starts(start, end):
         date_str = month_start.strftime("%Y%m%d")
+        month_str = month_start.strftime("%Y%m")
+        # 如果是當前月份，快取檔名加上今天日期，避免讀到舊的殘缺快取
+        if month_str == current_month_str:
+            cache_name = f"stock_day_{stock_no}_{date_str}_asof_{today_str}.json"
+        else:
+            cache_name = f"stock_day_{stock_no}_{date_str}.json"
         payload = fetch_json(
-            TWSE_STOCK_DAY_URL,
-            {"response": "json", "date": date_str, "stockNo": stock_no},
-            CACHE_DIR / f"stock_day_{stock_no}_{date_str}.json",
-            refresh,
-            sleep_seconds,
+                TWSE_STOCK_DAY_URL,
+                {"response": "json", "date": date_str, "stockNo": stock_no},
+                CACHE_DIR / cache_name,
+                refresh,
+                sleep_seconds,
         )
         if payload.get("stat") != "OK":
             continue
@@ -275,10 +283,18 @@ def fetch_foreign_for_dates(
             row.foreign_sell = parse_int(target[10])
             row.foreign_net = parse_int(target[11])
         elif len(target) >= 5:
-            # 5 欄位格式：買進、賣出、買賣超位於索引 2, 3, 4
-            row.foreign_buy = parse_int(target[2])
-            row.foreign_sell = parse_int(target[3])
-            row.foreign_net = parse_int(target[4])
+            # 5 欄位格式：買進、賣出、買賣超
+            # 加上 try-except 防禦機制，避免文字（如 '國巨*'）導致程式崩潰
+            try:
+                row.foreign_buy = parse_int(target[2])
+                row.foreign_sell = parse_int(target[3])
+                row.foreign_net = parse_int(target[4])
+            except ValueError:
+                # 如果抓到非數字欄位，設定為 0 並標記為資料缺失
+                row.foreign_buy = 0
+                row.foreign_sell = 0
+                row.foreign_net = 0
+                row.foreign_missing = True
         else:
             row.foreign_missing = True
 
