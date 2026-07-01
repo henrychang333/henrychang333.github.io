@@ -48,6 +48,6 @@ jobs:
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add docs/buildmystock_v2.html
+        git add docs/twse_buildmystock_v2.html
         git diff-index --quiet HEAD || git commit -m "Auto-updated stock charts"
         git push
