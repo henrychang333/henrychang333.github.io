@@ -100,11 +100,32 @@ def log(msg: str):
 
 def fetch_json(url: str):
     req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-        raw = resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as e:
+        # 把是哪個網址、狀態碼、以及伺服器實際回傳的內容（常見的 WAF/攔截頁面通常在這裡）
+        # 一併記錄下來，方便判斷是暫時性錯誤還是被擋（例如非台灣 IP 被擋、需要特定表頭等）。
+        body_snippet = ""
+        try:
+            body_snippet = e.read().decode("utf-8", errors="replace")[:500]
+        except Exception:
+            pass
+        raise RuntimeError(
+            f"HTTP {e.code} {e.reason} - URL: {url}"
+            + (f" - 回應內容前500字: {body_snippet}" if body_snippet else "")
+        ) from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"連線失敗 - URL: {url} - 原因: {e.reason}") from e
+
     # 有些政府網站的 JSON 檔含 BOM 或非標準編碼，這裡做寬鬆處理
     text = raw.decode("utf-8-sig", errors="replace")
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(
+            f"JSON 解析失敗 - URL: {url} - 回應內容前500字: {text[:500]}"
+        ) from e
 
 
 def extract_list(payload):
@@ -264,16 +285,18 @@ def write_output(data: dict):
         docs_tmp.replace(DOCS_DATA_FILE)
 
 
-def run_once():
+def run_once() -> bool:
     try:
         data = build_dashboard_data()
         write_output(data)
         log(f"更新成功，共 {data['count']} 筆航班")
-    except (urllib.error.URLError, urllib.error.HTTPError, ValueError,
-            json.JSONDecodeError) as e:
+        return True
+    except (RuntimeError, ValueError) as e:
         log(f"更新失敗：{e}")
+        return False
     except Exception as e:  # 保底，避免排程任務因未預期例外而整個中斷
         log(f"未預期錯誤：{e}")
+        return False
 
 
 def main():
@@ -287,10 +310,14 @@ def main():
     if args.loop and args.loop > 0:
         log(f"以迴圈模式啟動，每 {args.loop} 秒更新一次（Ctrl+C 結束）")
         while True:
-            run_once()
+            run_once()  # 迴圈模式下單次失敗不中斷程式，下一輪繼續重試
             time.sleep(args.loop)
     else:
-        run_once()
+        # 單次執行模式（cron / GitHub Actions 用）：失敗時要回傳非 0 結束碼，
+        # 這樣排程器 / CI 才能偵測到這次更新失敗（例如讓 GitHub Actions 該次執行顯示紅色，
+        # 並觸發後續設定的失敗通知或診斷步驟）。
+        success = run_once()
+        sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":
