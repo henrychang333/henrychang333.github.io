@@ -1,0 +1,48 @@
+name: Update KIA FIDS Data
+
+on:
+  schedule:
+    # 每 5 分鐘觸發一次。
+    # 注意：GitHub Actions 的 schedule 建議最小間隔為 5 分鐘，
+    # 且系統忙碌時實際觸發時間可能會延遲數分鐘，並非精準即時。
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}   # 允許在 GitHub 網頁上手動點擊執行，方便測試
+
+permissions:
+  contents: write   # 需要寫入權限才能把更新後的資料 commit 回 repo
+
+concurrency:
+  group: update-kia-fids
+  cancel-in-progress: true   # 避免上一次排程還沒跑完，下一次又觸發造成衝突
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+        # 不需要 pip install 任何套件，update_data.py 只用 Python 標準函式庫
+
+      - name: Run update script
+        run: python3 scripts/update_khfids_data.py
+        # 執行後會產生：
+        #   .cache/khfids/data.js
+        #   .cache/khfids/update.log
+        # 並自動複製一份 data.js 到 docs/data.js（因為 docs/ 目錄已存在於 repo 中）
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f .cache/khfids/data.js .cache/khfids/update.log docs/data.js
+          if git diff --cached --quiet; then
+            echo "沒有資料變動，略過 commit"
+          else
+            git commit -m "chore: update KIA FIDS data [skip ci]"
+            git push
+          fi
