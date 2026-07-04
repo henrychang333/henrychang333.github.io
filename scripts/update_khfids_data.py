@@ -41,6 +41,7 @@ update_data.py
 
 import json
 import sys
+import ssl
 import time
 import argparse
 import urllib.request
@@ -87,6 +88,18 @@ REQUEST_TIMEOUT = 15   # 秒
 MAX_RETRIES = 3        # 5xx / 連線失敗時最多重試次數（不含第一次嘗試）
 RETRY_BACKOFF_SECONDS = 5  # 每次重試間隔（秒），採固定間隔，第N次重試等待 N * 此秒數
 
+# 部分 .gov.tw 網站使用「政府憑證管理中心(GRCA)」簽發的憑證，
+# 這類憑證缺少新版 OpenSSL/Python 要求的 Subject Key Identifier 等擴充欄位，
+# 在較新的 Python/OpenSSL 版本下會被判定為「憑證格式不合格」而直接拒絕連線
+# （錯誤訊息類似：CERTIFICATE_VERIFY_FAILED: Missing Subject Key Identifier），
+# 這跟連線來源、網路環境無關，是憑證本身格式的相容性問題。
+#
+# 這裡的處理方式是：只針對「憑證驗證」這一關放寬（不驗證憑證鏈/不比對主機名稱），
+# 但連線本身仍然是走 HTTPS 加密。由於這裡抓的是機場公開開放資料（非機敏資訊），
+# 可以接受這樣的取捨；若之後想改成更嚴謹的作法，可以改成明確載入 GRCA 的根憑證
+# （可從 https://grca.nat.gov.tw/ 取得）讓驗證維持嚴格模式、只额外信任這個根憑證。
+INSECURE_SSL_CONTEXT = ssl._create_unverified_context()
+
 
 # ------------------------- 共用工具函式 -------------------------
 
@@ -106,7 +119,7 @@ def fetch_json(url: str):
     for attempt in range(1, MAX_RETRIES + 2):  # 第一次嘗試 + 最多 MAX_RETRIES 次重試
         req = urllib.request.Request(url, headers=HEADERS)
         try:
-            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT, context=INSECURE_SSL_CONTEXT) as resp:
                 raw = resp.read()
             break  # 成功就跳出重試迴圈
 
