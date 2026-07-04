@@ -3,25 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>高雄國際機場｜出境航班看板</title>
+<title>高雄國際機場｜出境航班看板 (UTC)</title>
 <style>
   :root{
-    --bg:#eef3f9;
-    --bg-accent-a:rgba(0,114,206,0.07);
-    --bg-accent-b:rgba(26,156,107,0.06);
+    --bg:#f4f7fc;                  
+    --bg-accent-a:rgba(0,114,206,0.04);
+    --bg-accent-b:rgba(26,156,107,0.03);
     --panel:#ffffff;
-    --line:#dde4ee;
-    --navy:#0b3d66;
-    --accent:#0072ce;
-    --accent-dim:#e5f1fc;
-    --amber:#b5690a;
-    --amber-bg:#fff3e0;
-    --green:#187a4f;
-    --green-bg:#e6f6ee;
-    --red:#c0342b;
-    --red-bg:#fdeceb;
-    --grey:#5b6b82;
-    --grey-light:#8494a8;
+    --line:#cbd5e1;                
+    --navy:#0f172a;                
+    --accent:#0284c7;              
+    --accent-dim:#f0f6ff;
+    --amber:#b45309;               
+    --amber-bg:#fef3c7;
+    --green:#166534;               
+    --green-bg:#dcfce7;
+    --red:#b91c1c;                 
+    --red-bg:#fee2e2;
+    --grey:#334155;                
+    --grey-light:#64748b;          
     --mono: "IBM Plex Mono","Courier New",monospace;
     --sans: "Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
   }
@@ -43,74 +43,121 @@
     display:flex;justify-content:space-between;align-items:center;
     padding:22px 40px 14px;
     background:var(--panel);
-    border-bottom:3px solid var(--accent);
+    border-bottom:4px solid var(--accent); 
+    box-shadow:0 2px 8px rgba(15,23,42,0.04);
   }
   .brand{display:flex;flex-direction:column;gap:2px;}
-  .brand .zh{font-size:26px;font-weight:700;letter-spacing:2px;color:var(--navy);}
-  .brand .en{font-size:12px;letter-spacing:4px;color:var(--grey-light);text-transform:uppercase;}
+  .brand .zh{font-size:28px;font-weight:700;letter-spacing:2px;color:var(--navy);}
+  .brand .en{font-size:13px;font-weight:600;letter-spacing:3px;color:var(--grey-light);text-transform:uppercase;}
   .clockbox{text-align:right;font-family:var(--mono);}
-  .clockbox .time{font-size:34px;color:var(--accent);letter-spacing:2px;font-weight:700;}
-  .clockbox .date{font-size:13px;color:var(--grey);}
+  .clockbox .time{font-size:36px;color:var(--accent);letter-spacing:2px;font-weight:700;}
+  .clockbox .date{font-size:14px;font-weight:600;color:var(--grey);}
 
   .statusbar{
     display:flex;justify-content:space-between;align-items:center;
-    padding:10px 40px;font-family:var(--mono);font-size:12px;
+    padding:12px 40px;font-family:var(--sans);font-size:13px; font-weight:600;
     color:var(--grey);background:var(--panel);border-bottom:1px solid var(--line);
   }
-  .statusbar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;
-    background:var(--green);margin-right:6px;box-shadow:0 0 6px var(--green);}
+  .statusbar .dot{display:inline-block;width:10px;height:10px;border-radius:50%;
+    background:var(--green);margin-right:8px;box-shadow:0 0 6px var(--green);}
   .statusbar .dot.stale{background:var(--red);box-shadow:0 0 6px var(--red);}
 
   .board-wrap{padding:24px 40px 40px;}
   table{
-    width:100%;border-collapse:collapse;font-family:var(--mono);
+    width:100%;border-collapse:collapse;font-family:var(--sans);
     background:var(--panel);border-radius:10px;overflow:hidden;
-    box-shadow:0 1px 3px rgba(11,61,102,0.08), 0 8px 24px rgba(11,61,102,0.05);
+    box-shadow:0 4px 6px -1px rgba(0,0,0,0.05), 0 10px 15px -3px rgba(0,0,0,0.05);
   }
   thead th{
-    text-align:left;font-size:13px;letter-spacing:2px;color:var(--grey);
-    text-transform:uppercase;padding:14px;background:#f4f7fb;
+    text-align:left;font-size:14px;font-weight:700;letter-spacing:2px;color:var(--navy);
+    text-transform:uppercase;padding:16px 14px;background:#e2e8f0; 
     border-bottom:2px solid var(--line);
   }
   tbody td{
-    padding:16px 14px;font-size:22px;border-bottom:1px solid var(--line);
+    padding:18px 14px;font-size:22px;border-bottom:1px solid var(--line);
     white-space:nowrap;
+    font-weight: 500; 
   }
-  tbody tr:nth-child(even){background:#fafcff;}
+  tbody tr:nth-child(even){background:#f8fafc;}
   tbody tr:hover{background:var(--accent-dim);}
-  .col-flight{color:var(--accent);font-weight:700;letter-spacing:1px;}
-  .col-dest{color:var(--navy);letter-spacing:2px;}
-  .col-dest small{display:block;color:var(--grey-light);font-size:12px;letter-spacing:1px;}
-  .col-time{color:var(--navy);}
-  .col-bay{color:var(--grey);}
-  .col-note{color:var(--grey);font-size:15px;white-space:normal;}
+  
+  .col-flight{color:var(--accent);font-weight:700;letter-spacing:1px;font-family:var(--mono);}
+  .col-dest{color:var(--navy);letter-spacing:2px;font-weight:700;}
+  .col-dest small{display:block;color:var(--grey);font-size:13px;font-weight:600;letter-spacing:1px;}
+  .col-time{color:var(--navy);font-family:var(--mono);font-weight:700;}
+  .col-bay{color:var(--navy);font-family:var(--mono);font-weight:700;}
+  .col-note{color:var(--grey);font-size:16px;font-weight:600;white-space:normal;}
 
   .status-pill{
-    display:inline-block;padding:4px 12px;border-radius:20px;
-    font-size:14px;letter-spacing:1px;border:1px solid transparent;font-weight:600;
+    display:inline-block;padding:6px 14px;border-radius:6px; 
+    font-size:15px;letter-spacing:1px;border:1px solid transparent;font-weight:700;
   }
   .status-normal{color:var(--green);background:var(--green-bg);border-color:var(--green);}
   .status-delay{color:var(--amber);background:var(--amber-bg);border-color:var(--amber);}
   .status-cancel{color:var(--red);background:var(--red-bg);border-color:var(--red);}
-  .status-default{color:var(--grey);background:#f1f4f8;border-color:var(--line);}
+  .status-default{color:var(--grey);background:#e2e8f0;border-color:var(--line);}
+
+  tbody tr.row-cancel {
+    background-color: #fecdd3 !important; 
+  }
+  tbody tr.row-cancel:hover { 
+    background-color: #fda4af !important; 
+  }
+
+  tbody tr.row-departed {
+    background-color: #fefce8 !important; 
+  }
+  tbody tr.row-departed:hover { 
+    background-color: #fef9c3 !important; 
+  }
+  
+  .toggle-btn {
+    cursor: pointer;
+    display: inline-block;
+    width: 26px;
+    height: 26px;
+    line-height: 22px;
+    text-align: center;
+    border: 2px solid var(--amber);
+    background: #fff;
+    color: var(--amber);
+    border-radius: 6px;
+    margin-right: 12px;
+    font-size: 18px;
+    font-weight: 800;
+    user-select: none;
+    transition: all 0.15s ease;
+  }
+  .toggle-btn:hover {
+    background: var(--amber);
+    color: #fff;
+  }
+  
+  .child-departed-row {
+    display: none;
+  }
+  .child-departed-row.expanded {
+    display: table-row;
+  }
 
   .empty, .error{
-    text-align:center;padding:60px 20px;color:var(--grey-light);font-family:var(--mono);
+    text-align:center;padding:60px 20px;color:var(--grey);font-family:var(--sans);font-size:18px;font-weight:600;
   }
-  .error{color:var(--red);}
+  .error{color:var(--red);font-weight:700;}
 
   footer{
-    padding:14px 40px 26px;font-size:11px;color:var(--grey-light);
-    font-family:var(--mono);letter-spacing:1px;
+    padding:16px 40px 30px;font-size:13px;color:var(--grey);
+    font-family:var(--sans);letter-spacing:1px;font-weight:600;
     display:flex;justify-content:space-between;
   }
 
   @media (max-width:900px){
     header,.statusbar,.board-wrap,footer{padding-left:16px;padding-right:16px;}
-    tbody td{font-size:16px;padding:10px 8px;}
-    thead th{font-size:10px;padding:6px 8px;}
-    .brand .zh{font-size:18px;}
-    .clockbox .time{font-size:22px;}
+    tbody td{font-size:16px;padding:12px 8px;}
+    thead th{font-size:12px;padding:10px 8px;}
+    .brand .zh{font-size:20px;}
+    .clockbox .time{font-size:24px;}
+    .toggle-btn { width: 22px; height: 22px; line-height: 18px; font-size: 14px; margin-right: 6px; }
   }
 </style>
 </head>
@@ -118,18 +165,18 @@
 
 <header>
   <div class="brand">
-    <span class="zh">高雄國際機場　出境航班動態</span>
-    <span class="en">Kaohsiung International Airport · Departures</span>
+    <span class="zh">高雄國際機場 出境航班動態</span>
+    <span class="en">Kaohsiung International Airport · Departures (UTC)</span>
   </div>
   <div class="clockbox">
-    <div class="time" id="clock">--:--:--</div>
+    <div class="time" id="clock">--:--:-- UTC</div>
     <div class="date" id="today">----年--月--日</div>
   </div>
 </header>
 
 <div class="statusbar">
   <span><span class="dot" id="statusDot"></span><span id="statusText">正在載入資料…</span></span>
-  <span id="lastUpdated">最後更新：--</span>
+  <span id="lastUpdated">最後更新：-- (UTC)</span>
 </div>
 
 <div class="board-wrap">
@@ -138,7 +185,7 @@
       <tr>
         <th style="width:16%">航班編號</th>
         <th style="width:16%">目的地</th>
-        <th style="width:12%">表定時間</th>
+        <th style="width:12%">表定時間 (UTC)</th>
         <th style="width:14%">狀態</th>
         <th style="width:10%">停機位</th>
         <th style="width:32%">備註</th>
@@ -151,48 +198,39 @@
 </div>
 
 <footer>
-  <span>資料來源：高雄國際機場開放資料（經代碼轉換整併）</span>
+  <span>資料來源：高雄國際機場開放資料</span>
   <span id="countInfo">共 0 筆航班</span>
 </footer>
 
 <script>
-  const DATA_URL = "data.js";             // 由 update_data.py / update_data.ahk 產出，與本頁放在同一個目錄
-  const REFRESH_INTERVAL_MS = 30 * 1000;  // 每 30 秒重新讀取一次 data.js
-  const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 超過 5 分鐘沒更新視為「資料可能中斷」
-
-  // 說明：這裡刻意不用 fetch()/XMLHttpRequest 讀取 data.js，
-  // 因為瀏覽器在 file:// 協定下（直接雙擊開啟 html、或放在本機硬碟開啟時）
-  // 會擋掉這類本機檔案的讀取請求。改用「動態插入 <script> 標籤」的方式載入，
-  // 這種載入資源的方式不受此限制，因此不管是 file://、本機磁碟、或正式 Web Server
-  // 都能正常運作，不需要另外架設任何伺服器。
+  const DATA_URL = "data.js";             
+  const REFRESH_INTERVAL_MS = 120 * 1000;  // 120秒刷新一次
+  const STALE_THRESHOLD_MS = 5 * 60 * 1000; 
 
   function pad(n){ return String(n).padStart(2,"0"); }
 
+  // 1. 將現在時間切換為 UTC 時間
   function tickClock(){
     const now = new Date();
     document.getElementById("clock").textContent =
-      `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      `${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())} UTC`;
     document.getElementById("today").textContent =
-      `${now.getFullYear()}年${pad(now.getMonth()+1)}月${pad(now.getDate())}日`;
+      `${now.getUTCFullYear()}年${pad(now.getUTCMonth()+1)}月${pad(now.getUTCDate())}日`;
   }
   setInterval(tickClock, 1000);
   tickClock();
 
-  // 狀態代碼對照表
   const STATUS_MAP = {
     "1": "準時", "2": "報到", "3": "登機", "4": "離站",
     "5": "延遲登機", "6": "延遲", "7": "取消"
   };
 
-  // 備註代碼對照表
   const NOTE_MAP = {
     "1": "時間異動", "2": "天氣影響", "3": "地面作業", "4": "來機晚到",
     "5": "流量管制", "6": "班機調度", "7": "航機檢修", "8": "航班退關",
     "9": "延至明日", "10": "前日航班", "11": "機場關閉", "12": "延至隔日"
   };
 
-  // 代碼對照：支援單一代碼，也相容多筆代碼以逗號/斜線等分隔的情況；
-  // 對照不到的代碼一律顯示為空字串
   function mapCode(map, raw){
     if (raw === undefined || raw === null || raw === "") return "";
     const parts = String(raw).split(/[,，\/;、\s]+/).filter(Boolean);
@@ -200,15 +238,34 @@
     return mapped.join("、");
   }
 
-  // 表定時間只顯示時分，例如 "2026-07-04 06:55:00" -> "0655"
-  function formatSTD(std){
+  // 2. 將原始台灣當地表定時間 (STD) 轉換為 UTC 時間
+  function formatSTDToUTC(std){
     if (!std) return "";
+    let hours = 0;
+    let minutes = 0;
+    
     const m = String(std).match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
     if (m){
-      return String(m[1]).padStart(2, "0") + m[2];
+      hours = parseInt(m[1], 10);
+      minutes = parseInt(m[2], 10);
+    } else {
+      const digits = String(std).replace(/[^0-9]/g, "");
+      if (digits.length >= 4) {
+        hours = parseInt(digits.slice(-4, -2), 10);
+        minutes = parseInt(digits.slice(-2), 10);
+      } else {
+        return std; 
+      }
     }
-    const digits = String(std).replace(/[^0-9]/g, "");
-    return digits.slice(-4);
+
+    // 建立一個當前日期的 Date 物件（以台灣時間設定時分），再透過減去 8 小時得到 UTC 時間
+    const localDate = new Date();
+    localDate.setHours(hours, minutes, 0, 0);
+    
+    // 減去 8 小時（台灣與 UTC 時差）
+    localDate.setHours(localDate.getHours() - 8);
+
+    return pad(localDate.getHours()) + "" + pad(localDate.getMinutes());
   }
 
   function classifyStatus(statusText){
@@ -219,11 +276,25 @@
     return "status-default";
   }
 
+  window.toggleDepartedRows = function(btn) {
+    const childRows = document.querySelectorAll('.child-departed-row');
+    const isExpanded = btn.textContent === '-';
+    
+    childRows.forEach(row => {
+      if (isExpanded) {
+        row.classList.remove('expanded');
+      } else {
+        row.classList.add('expanded');
+      }
+    });
+
+    btn.textContent = isExpanded ? '+' : '-';
+  }
+
   function renderFlights(payload){
     const tbody = document.getElementById("flightBody");
     const allFlights = payload.flights || [];
 
-    // 目的地 ICAO 前2碼為 RC 開頭者不顯示（RC 為台灣機場代碼開頭，用於排除國內航班等情況）
     const flights = allFlights.filter(f => {
       const icao = String(f.ArrivalAirport || "").toUpperCase();
       return icao.slice(0, 2) !== "RC";
@@ -236,22 +307,72 @@
       return;
     }
 
-    tbody.innerHTML = flights.map(f => {
+    const activeFlights = [];
+    const departedFlights = [];
+
+    flights.forEach(f => {
+      const statusDisplay = mapCode(STATUS_MAP, f.statusdep);
+      if (statusDisplay.includes("離站")) {
+        departedFlights.push(f);
+      } else {
+        activeFlights.push(f);
+      }
+    });
+
+    let htmlMarkup = "";
+
+    // 【修改】1. 將離站航班改為優先渲染在「最上方」
+    if (departedFlights.length > 0) {
+      htmlMarkup += `
+        <tr class="row-departed">
+          <td colspan="6" style="font-size:18px; padding: 14px 14px; font-weight: 700;">
+            <span class="toggle-btn" onclick="toggleDepartedRows(this)">+</span>
+            <span style="color: var(--amber);">離站航班總覽</span> —— 已出發航班 (點擊展開計 ${departedFlights.length} 筆)
+          </td>
+        </tr>
+      `;
+
+      departedFlights.forEach(f => {
+        const statusDisplay = mapCode(STATUS_MAP, f.statusdep);
+        const noteDisplay = mapCode(NOTE_MAP, f.notedep);
+        const statusClass = classifyStatus(statusDisplay);
+
+        htmlMarkup += `
+          <tr class="child-departed-row row-departed">
+            <td class="col-flight" style="padding-left: 52px;">${escapeHtml(f.airLineNum || "")}</td>
+            <td class="col-dest">${escapeHtml(f.ArrivalAirport || "")}
+              <small>${escapeHtml(f.ArrivalAirport_orig || "")}</small>
+            </td>
+            <td class="col-time">${escapeHtml(formatSTDToUTC(f.STD))}</td>
+            <td><span class="status-pill ${statusClass}">${escapeHtml(statusDisplay || "—")}</span></td>
+            <td class="col-bay">${escapeHtml(f.Bay || "—")}</td>
+            <td class="col-note">${escapeHtml(noteDisplay)}</td>
+          </tr>
+        `;
+      });
+    }
+
+    // 2. 接著渲染其他正常或取消的航班
+    activeFlights.forEach(f => {
       const statusDisplay = mapCode(STATUS_MAP, f.statusdep);
       const noteDisplay = mapCode(NOTE_MAP, f.notedep);
       const statusClass = classifyStatus(statusDisplay);
-      return `
-        <tr>
+      const rowClass = statusDisplay.includes("取消") ? "row-cancel" : "";
+
+      htmlMarkup += `
+        <tr class="${rowClass}">
           <td class="col-flight">${escapeHtml(f.airLineNum || "")}</td>
           <td class="col-dest">${escapeHtml(f.ArrivalAirport || "")}
             <small>${escapeHtml(f.ArrivalAirport_orig || "")}</small>
           </td>
-          <td class="col-time">${escapeHtml(formatSTD(f.STD))}</td>
+          <td class="col-time">${escapeHtml(formatSTDToUTC(f.STD))}</td>
           <td><span class="status-pill ${statusClass}">${escapeHtml(statusDisplay || "—")}</span></td>
           <td class="col-bay">${escapeHtml(f.Bay || "—")}</td>
           <td class="col-note">${escapeHtml(noteDisplay)}</td>
         </tr>`;
-    }).join("");
+    });
+
+    tbody.innerHTML = htmlMarkup;
   }
 
   function escapeHtml(str){
@@ -276,10 +397,12 @@
       renderFlights(payload);
       document.getElementById("flightBody").dataset.hasData = "1";
 
+      // 3. 將最後更新時間轉換為 UTC 格式顯示
       const updatedAt = new Date(payload.updated_at);
       const ageMs = Date.now() - updatedAt.getTime();
-      document.getElementById("lastUpdated").textContent =
-        `最後更新：${updatedAt.toLocaleTimeString("zh-TW",{hour12:false})}`;
+      
+      const utcTimeStr = `${pad(updatedAt.getUTCHours())}:${pad(updatedAt.getUTCMinutes())}:${pad(updatedAt.getUTCSeconds())}`;
+      document.getElementById("lastUpdated").textContent = `最後更新：${utcTimeStr} (UTC)`;
 
       if (ageMs > STALE_THRESHOLD_MS){
         setStatus(false, `資料已超過 ${Math.round(ageMs/60000)} 分鐘未更新，請檢查後端更新程式`);
@@ -297,7 +420,6 @@
   }
 
   function loadData(){
-    // 移除舊的 <script> 標籤，改插入新的（並用時間戳記避免瀏覽器快取舊內容）
     const old = document.getElementById("fidsDataScript");
     if (old) old.remove();
 
