@@ -83,7 +83,9 @@ HEADERS = {
 }
 
 
-REQUEST_TIMEOUT = 15  # 秒
+REQUEST_TIMEOUT = 15   # 秒
+MAX_RETRIES = 3        # 5xx / 連線失敗時最多重試次數（不含第一次嘗試）
+RETRY_BACKOFF_SECONDS = 5  # 每次重試間隔（秒），採固定間隔，第N次重試等待 N * 此秒數
 
 
 # ------------------------- 共用工具函式 -------------------------
@@ -99,24 +101,42 @@ def log(msg: str):
 
 
 def fetch_json(url: str):
-    req = urllib.request.Request(url, headers=HEADERS)
-    try:
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            raw = resp.read()
-    except urllib.error.HTTPError as e:
-        # 把是哪個網址、狀態碼、以及伺服器實際回傳的內容（常見的 WAF/攔截頁面通常在這裡）
-        # 一併記錄下來，方便判斷是暫時性錯誤還是被擋（例如非台灣 IP 被擋、需要特定表頭等）。
-        body_snippet = ""
+    last_error = None
+
+    for attempt in range(1, MAX_RETRIES + 2):  # 第一次嘗試 + 最多 MAX_RETRIES 次重試
+        req = urllib.request.Request(url, headers=HEADERS)
         try:
-            body_snippet = e.read().decode("utf-8", errors="replace")[:500]
-        except Exception:
-            pass
-        raise RuntimeError(
-            f"HTTP {e.code} {e.reason} - URL: {url}"
-            + (f" - 回應內容前500字: {body_snippet}" if body_snippet else "")
-        ) from e
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"連線失敗 - URL: {url} - 原因: {e.reason}") from e
+            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+                raw = resp.read()
+            break  # 成功就跳出重試迴圈
+
+        except urllib.error.HTTPError as e:
+            body_snippet = ""
+            try:
+                body_snippet = e.read().decode("utf-8", errors="replace")[:500]
+            except Exception:
+                pass
+            last_error = RuntimeError(
+                f"HTTP {e.code} {e.reason} - URL: {url}"
+                + (f" - 回應內容前500字: {body_snippet}" if body_snippet else "（回應內容為空）")
+            )
+            # 4xx 通常代表持續性拒絕（例如被擋、網址錯誤），重試也不會變好，直接放棄
+            if 400 <= e.code < 500:
+                raise last_error from e
+            # 5xx 視為可能的暫時性錯誤，值得重試
+            if attempt <= MAX_RETRIES:
+                log(f"第 {attempt} 次嘗試失敗（{e.code}），{RETRY_BACKOFF_SECONDS * attempt} 秒後重試 - {url}")
+                time.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                continue
+            raise last_error from e
+
+        except urllib.error.URLError as e:
+            last_error = RuntimeError(f"連線失敗 - URL: {url} - 原因: {e.reason}")
+            if attempt <= MAX_RETRIES:
+                log(f"第 {attempt} 次嘗試連線失敗，{RETRY_BACKOFF_SECONDS * attempt} 秒後重試 - {url}")
+                time.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                continue
+            raise last_error from e
 
     # 有些政府網站的 JSON 檔含 BOM 或非標準編碼，這裡做寬鬆處理
     text = raw.decode("utf-8-sig", errors="replace")
