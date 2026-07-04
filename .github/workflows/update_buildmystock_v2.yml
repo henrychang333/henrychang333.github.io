@@ -3,7 +3,7 @@ name: Auto Update Stock HTML
 on:
   schedule:
     # 國際標準時間 (UTC) 每日 08:30，即台灣時間 (UTC+8) 每日下午 16:00-17:30 執行
-    - cron: '0,30 8-9 * * 1-5'
+    - cron: '0 8-9 * * 1-5'
   workflow_dispatch: # 允許手動點擊觸發
 
 jobs:
