@@ -1,0 +1,14 @@
+{
+  "_說明": "此表格式為 IATA3碼: ICAO4碼。凡是在此表中列出的機場，一律優先採用此表的結果，不使用 airport2.json 的資料。請依實際發現 airport2.json 有誤的機場自行增修。以下僅為範例，請自行核對正確性後使用。",
+  "HKG": "VHHH",
+  "NRT": "RJAA",
+  "HND": "RJTT",
+  "KIX": "RJBB",
+  "ICN": "RKSI",
+  "PVG": "ZSPD",
+  "PEK": "ZBAA",
+  "MFM": "VMMC",
+  "BKK": "VTBS",
+  "SIN": "WSSS",
+  "MNL": "RPLL"
+}
