@@ -1,4 +1,4 @@
-name: TWSE Dashboard Update
+name: Auto Update top30_foreign_trade_v2
 
 on:
   schedule:
