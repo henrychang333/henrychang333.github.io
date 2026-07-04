@@ -1,4 +1,4 @@
-name: Auto Update Stock HTML
+name: Auto Update buildmystock_v2
 
 on:
   schedule:
