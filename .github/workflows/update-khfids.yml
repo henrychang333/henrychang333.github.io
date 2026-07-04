@@ -29,7 +29,7 @@ jobs:
         # 不需要 pip install 任何套件，update_data.py 只用 Python 標準函式庫
 
       - name: Run update script
-        run: python3 scripts/update_khfids_data.py
+        run: python scripts/update_khfids_data.py
         # 執行後會產生：
         #   .cache/khfids/data.js
         #   .cache/khfids/update.log
