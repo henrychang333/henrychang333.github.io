@@ -29,11 +29,26 @@ jobs:
         # 不需要 pip install 任何套件，update_data.py 只用 Python 標準函式庫
 
       - name: Run update script
-        run: python scripts/update_khfids_data.py
+        run: python scripts/update_data.py
         # 執行後會產生：
         #   .cache/khfids/data.js
         #   .cache/khfids/update.log
         # 並自動複製一份 data.js 到 docs/data.js（因為 docs/ 目錄已存在於 repo 中）
+
+      - name: Debug - curl source URLs on failure
+        if: failure()
+        run: |
+          echo "=== dep.php ==="
+          curl -i -sS --max-time 15 "https://ccc.kia.gov.tw/fids/json/web/dep.php" || true
+          echo ""
+          echo "=== airline2.json ==="
+          curl -i -sS --max-time 15 "https://www.kia.gov.tw/data/airline2.json" || true
+          echo ""
+          echo "=== airport2.json ==="
+          curl -i -sS --max-time 15 "https://www.kia.gov.tw/data/airport2.json" || true
+        continue-on-error: true
+        # 只有在上一步失敗時才會執行，把三個來源的完整回應（含 HTTP headers）印到
+        # workflow 的 log 裡，方便判斷是被防火牆/WAF 擋下來，還是網站本身暫時性錯誤。
 
       - name: Commit and push if changed
         run: |
