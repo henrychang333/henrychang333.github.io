@@ -27,6 +27,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import requests
+import time
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -77,6 +78,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep", type=float, default=0.45, help="Delay between API calls")
     parser.add_argument("--refresh", action="store_true", help="Ignore local JSON cache")
     return parser.parse_args()
+    
+def clean_old_cache(cache_dir: Path, days: int = 180):
+    if not cache_dir.exists():
+        return
+    cutoff = time.time() - (days * 24 * 60 * 60)
+    for file_path in cache_dir.glob("*"):
+        if file_path.is_file() and file_path.stat().st_mtime < cutoff:
+            file_path.unlink()
+            print(f"已自動刪除過期暫存: {file_path.name}")
 
 
 def add_months(d: date, months: int) -> date:
@@ -977,6 +987,10 @@ def main() -> int:
     output_html = Path(args.output).resolve()
     end = datetime.strptime(args.end_date, "%Y-%m-%d").date()
     start = add_months(end, -args.months)
+    
+    clean_old_cache(CACHE_DIR, days=180)
+    
+    watch_file = Path(args.watch).resolve()
 
     codes = read_watch_codes(watch_file)
     print(f"Building {output_html} for {len(codes)} stock(s): {', '.join(codes)}")
