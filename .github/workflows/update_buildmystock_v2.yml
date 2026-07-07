@@ -42,7 +42,7 @@ jobs:
         pip install requests
 
     - name: Run script to build HTML
-      run: python scripts/buildmystock_v2.py
+      run: python scripts/buildmystock_v2.py --refresh
 
     - name: Commit and Push changes
       run: |
