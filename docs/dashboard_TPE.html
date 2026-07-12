@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>桃園機場航班監控 (TPE)</title>
+<style>
+  :root {
+    --bg-page: #eef1f6;
+    --toolbar-from: #1e293b;
+    --toolbar-to: #334155;
+    --accent: #3b82f6;
+    --accent-dark: #2563eb;
+    --border-color: #e2e8f0;
+    --text-main: #1f2937;
+    --font-base: 15px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: "Microsoft JhengHei", "Segoe UI", Arial, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-main);
+    overflow-x: hidden;
+    font-size: var(--font-base);
+  }
+  .toolbar {
+    background: linear-gradient(135deg, var(--toolbar-from), var(--toolbar-to));
+    color: #fff;
+    padding: 14px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  }
+  .toolbar-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .toolbar h1 {
+    font-size: 20px;
+    margin: 0;
+    font-weight: 700;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+  }
+  .clock-block {
+    text-align: right;
+    line-height: 1.7;
+    white-space: nowrap;
+  }
+  .utc-now {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .update-info {
+    font-size: 13px;
+    opacity: 0.9;
+  }
+  .filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .filters label { font-size: 14px; }
+  .filters input, .filters select {
+    padding: 7px 10px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .filters input:focus, .filters select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.25);
+  }
+  .filters input[type="text"] { width: 220px; }
+  .filters button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .filters button:hover { background: var(--accent-dark); }
+  .filters button:active { transform: scale(0.97); }
+  #countInfo { font-size: 14px; opacity: 0.95; white-space: nowrap; font-weight: 600; }
+  .hint {
+    font-size: 13px;
+    color: #334155;
+    background: #fff;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+    padding: 10px 16px;
+    background: #fff;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+    color: #334155;
+  }
+  .legend-title { font-weight: 700; color: var(--text-main); margin-right: 4px; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .chip {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  .chip-checkin { background: #e0f2fe; }
+  .chip-delayed { background: #ffedd5; }
+  .chip-timechange { background: #ede9fe; }
+  .chip-inspect { background: #fef3c7; }
+  .chip-ontime { background: #dcfce7; }
+  .chip-boarding { background: #dbeafe; }
+  .chip-closed { background: #fce7f3; }
+  .chip-cancelled { background: #fecaca; }
+  .chip-departed { background: #e5e7eb; }
+  .table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 150px);
+    width: 100%;
+    margin: 0;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  table { border-collapse: collapse; width: 100%; font-size: var(--font-base); table-layout: auto; }
+  th, td {
+    border: 1px solid var(--border-color);
+    padding: 8px 10px;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    text-align: left;
+  }
+  th.nowrap-col, td.nowrap-col {
+    white-space: nowrap;
+    word-break: normal;
+    overflow-wrap: normal;
+    min-width: 110px;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--toolbar-to);
+    color: #fff;
+    z-index: 5;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  thead th.clickable-header {
+    cursor: pointer;
+    text-decoration: underline dotted;
+  }
+  thead th.clickable-header:hover { background: #475569; }
+  thead th.clickable-header.active-field { background: var(--accent-dark); }
+  tbody tr { transition: background 0.1s; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody tr:hover { background: #e0f2fe; }
+
+  /* 依「狀態」欄位的關鍵字分類底色：準時/延遲/時間更改（出發、已到、取消另有獨立摺疊樣式） */
+  tr.remark-checkin td { background: #e0f2fe; color: #0c4a6e; font-weight: 600; }
+  tr.remark-delayed td { background: #ffedd5; color: #7c2d12; font-weight: 600; }
+  tr.remark-timechange td { background: #ede9fe; color: #4c1d95; font-weight: 600; }
+  tr.remark-inspect td { background: #fef3c7; color: #78350f; font-weight: 600; }
+  tr.remark-ontime td { background: #dcfce7; color: #14532d; font-weight: 600; }
+  tr.remark-boarding td { background: #dbeafe; color: #1e3a8a; font-weight: 600; }
+  tr.remark-closed td { background: #fce7f3; color: #831843; font-weight: 600; }
+
+  tr.departed-row td { background: #f3f4f6; color: #4b5563; font-style: italic; font-weight: 500; }
+  tr.departed-toggle-row td {
+    background: #eef2f7;
+    color: #1e293b;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+    font-size: 14px;
+  }
+  tr.departed-toggle-row:hover td { background: #e2e8f0; }
+  tr.cancelled-row td { background: #fee2e2; color: #7f1d1d; font-weight: 600; }
+  tr.cancelled-toggle-row td {
+    background: #fecaca;
+    color: #7f1d1d;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+    font-size: 14px;
+  }
+  tr.cancelled-toggle-row:hover td { background: #fca5a5; }
+  .empty-msg { padding: 40px; text-align: center; color: #888; font-size: 15px; }
+  .value-dropdown {
+    position: absolute;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+    max-height: 320px;
+    overflow-y: auto;
+    z-index: 100;
+    min-width: 170px;
+    font-size: 14px;
+  }
+  .value-dropdown .vd-item {
+    padding: 8px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s;
+  }
+  .value-dropdown .vd-pair { padding: 6px 14px; line-height: 1.35; }
+  .value-dropdown .vd-item:hover { background: #e0f2fe; }
+  .value-dropdown .vd-clear {
+    color: #dc2626;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="toolbar-top">
+    <h1>桃園機場航班監控 (TPE)</h1>
+    <div class="clock-block">
+      <div class="utc-now">目前 UTC 時間：<span id="utcNow">--:--:--</span></div>
+      <div class="update-info">最後更新時間：<span id="updateTime">尚未載入</span></div>
+    </div>
+  </div>
+  <div class="filters">
+    <label>欄位：
+      <select id="fieldSelect">
+        <option value="__all__">全部欄位</option>
+      </select>
+    </label>
+    <label>關鍵字：
+      <input type="text" id="keywordInput" placeholder="輸入關鍵字篩選...">
+    </label>
+    <button id="todayBtn">今日</button>
+    <button id="clearBtn">清除篩選</button>
+    <button id="refreshBtn">立即重新讀取</button>
+    <span id="countInfo"></span>
+  </div>
+</div>
+<div class="hint" style="margin:6px 16px 0;">
+  提示：點選表頭的 <b>航廈</b>、<b>種類</b>、<b>航空公司代碼</b>、<b>往來地點</b>、<b>其他航點</b>、<b>表訂日期</b>、<b>狀態</b> 欄位名稱，
+  可切換成用該欄位篩選，並會列出該欄位目前所有可選的值供點選（機場/航空公司代碼欄位會同時顯示 ICAO(上)/原本代碼(下)，
+  下拉選單與手動輸入的關鍵字篩選都同時比對兩種代碼）。預設只顯示「表訂日期」為今天的資料，可自行清除或更換篩選條件查看其他日期。
+  狀態為「出發」或「已到」的資料會自動摺疊（點選展開），狀態為「取消」的資料會以紅色底色摺疊顯示，與已出發/已到的摺疊資料分開。
+  所有資料依「表訂時間(UTC)」由早到晚排序。
+</div>
+
+<div class="legend">
+  <span class="legend-title">狀態圖例：</span>
+  <span class="legend-item"><i class="chip chip-ontime"></i>準時</span>
+  <span class="legend-item"><i class="chip chip-delayed"></i>延遲</span>
+  <span class="legend-item"><i class="chip chip-timechange"></i>時間更改</span>
+  <span class="legend-item"><i class="chip chip-departed"></i>出發/已到(摺疊)</span>
+  <span class="legend-item"><i class="chip chip-cancelled"></i>取消(摺疊)</span>
+</div>
+
+<div class="table-wrap">
+  <table id="dataTable">
+    <thead><tr id="headerRow"></tr></thead>
+    <tbody id="bodyRows"></tbody>
+  </table>
+  <div id="emptyMsg" class="empty-msg" style="display:none;">目前沒有資料，請確認 GitHub Actions 排程(scripts/fetch_flights_tpe.py)是否有成功執行並更新 flights_data_tpe.js。</div>
+</div>
+<div id="valueDropdown" class="value-dropdown" style="display:none;"></div>
+
+<script>
+  // 顯示欄位順序（依需求指定的順序；「航空公司名」對應航空公司中文名稱欄位）
+  const DISPLAY_COLUMNS = [
+    '表訂日期', '航空公司名', '航空公司代碼', '班次',
+    '表訂時間UTC', '預計時間UTC',
+    '往來地點', '往來地點中文',
+    '狀態', '機型', '機門', '航廈', '種類',
+    '其他航點', '其他航點中文',
+    '行李轉盤', '報到櫃台'
+  ];
+
+  // 點選表頭即可切換篩選欄位、並顯示可選值下拉選單的欄位
+  const QUICK_FILTER_FIELDS = ['航廈', '種類', '航空公司代碼', '往來地點', '其他航點', '表訂日期', '狀態'];
+
+  // 這些欄位要把「原本代碼」跟「ICAO」合併顯示在同一格(ICAO在上、原本代碼在下)，
+  // 也要合併篩選(打關鍵字或選下拉選單時，兩種代碼都算數)
+  const COMBINED_CODE_FIELDS = {
+    '航空公司代碼': '航空公司代碼ICAO',
+    '往來地點': '往來地點ICAO',
+    '其他航點': '其他航點ICAO'
+  };
+
+  // 需要用「日期 時間 UTC」格式顯示的欄位（scripts/fetch_flights_tpe.py 已經算好完整 UTC ISO 時間字串）
+  const UTC_DATETIME_FIELDS = ['表訂時間UTC', '預計時間UTC'];
+
+  // 欄位寬度(%)：內容較短、固定的欄位縮小，其他欄位分配較多空間
+  // （航空公司名、航空公司代碼不設寬度，讓瀏覽器依實際內容自動調整）
+  const COLUMN_WIDTHS = {
+    '表訂日期': 8,
+    '班次': 5,
+    '表訂時間UTC': 5,
+    '預計時間UTC': 5,
+    '往來地點': 6,
+    '往來地點中文': 9,
+    '狀態': 6,
+    '機型': 4,
+    '機門': 4,
+    '航廈': 4,
+    '種類': 4,
+    '其他航點': 6,
+    '其他航點中文': 9,
+    '行李轉盤': 4,
+    '報到櫃台': 5
+  };
+
+  // 這些欄位的內容不換行，寬度會依資料內容自動撐開
+  const NOWRAP_FIELDS = ['航空公司名', '航空公司代碼'];
+
+  let columns = DISPLAY_COLUMNS;
+  let flatRows = [];
+  let columnsBuilt = false;
+  let defaultFilterApplied = false;
+  let departedExpanded = false;  // 「出發/已到」資料是否展開
+  let cancelledExpanded = false; // 「取消」資料是否展開
+
+  function todayStr() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function parseISODate(str) {
+    if (!str) return null;
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function formatUTCDisplay(str) {
+    if (!str) return '';
+    // "2026-07-12T06:30:00Z" -> "0630"
+    const m = String(str).match(/^\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2})/);
+    if (!m) return str;
+    return `${m[1]}${m[2]}`;
+  }
+
+  function isCancelled(flat) {
+    return String(flat['狀態'] ?? '').includes('取消');
+  }
+
+  function isDepartedOrArrived(flat) {
+    const v = String(flat['狀態'] ?? '');
+    return v.includes('出發') || v.includes('已到');
+  }
+
+  // 依「狀態」內容判斷一般資料列要套用哪一種底色分類(取消/出發/已到另有獨立摺疊樣式)
+  function getRemarkClass(flat) {
+    const raw = String(flat['狀態'] ?? '');
+    if (raw.includes('時間更改')) return 'remark-timechange';
+    if (raw.includes('延遲')) return 'remark-delayed';
+    if (raw.includes('準時')) return 'remark-ontime';
+    return '';
+  }
+
+  // 依「表訂時間UTC」由早到晚排序；沒有時間的資料排到最後
+  function sortByScheduleTime(rows) {
+    return rows.slice().sort((a, b) => {
+      const da = parseISODate(a['表訂時間UTC']);
+      const db = parseISODate(b['表訂時間UTC']);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da - db;
+    });
+  }
+
+  // 取得某個合併代碼欄位的所有不重複「代碼配對」，用於下拉選單顯示(ICAO在上、原本代碼在下)
+  function getCombinedPairs(column) {
+    const icaoField = COMBINED_CODE_FIELDS[column];
+    const seen = new Set();
+    const pairs = [];
+    for (const r of flatRows) {
+      const idVal = String(r[column] ?? '');
+      const icaoVal = String(r[icaoField] ?? '');
+      if (idVal === '' && icaoVal === '') continue;
+      const key = idVal + '|' + icaoVal;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pairs.push({ id: idVal, icao: icaoVal });
+    }
+    pairs.sort((a, b) => (a.icao || a.id).localeCompare(b.icao || b.id));
+    return pairs;
+  }
+
+  function showValueDropdown(column, anchorEl) {
+    const dropdown = document.getElementById('valueDropdown');
+    dropdown.innerHTML = '';
+
+    const clearItem = document.createElement('div');
+    clearItem.className = 'vd-item vd-clear';
+    clearItem.textContent = '✕ 清除此欄位篩選';
+    clearItem.addEventListener('click', () => {
+      document.getElementById('keywordInput').value = '';
+      hideValueDropdown();
+      renderTable();
+    });
+    dropdown.appendChild(clearItem);
+
+    if (COMBINED_CODE_FIELDS[column]) {
+      const pairs = getCombinedPairs(column);
+      for (const p of pairs) {
+        const item = document.createElement('div');
+        item.className = 'vd-item vd-pair';
+        const line1 = document.createElement('div');
+        line1.textContent = p.icao || '-';
+        line1.style.fontWeight = '600';
+        const line2 = document.createElement('div');
+        line2.textContent = p.id || '-';
+        line2.style.fontSize = '11px';
+        line2.style.color = '#6b7280';
+        item.appendChild(line1);
+        item.appendChild(line2);
+        item.addEventListener('click', () => {
+          document.getElementById('fieldSelect').value = column;
+          document.getElementById('keywordInput').value = p.id || p.icao;
+          hideValueDropdown();
+          renderTable();
+        });
+        dropdown.appendChild(item);
+      }
+    } else {
+      const values = Array.from(new Set(flatRows.map(r => String(r[column] ?? '')).filter(v => v !== ''))).sort();
+      for (const v of values) {
+        const item = document.createElement('div');
+        item.className = 'vd-item';
+        item.textContent = v;
+        item.addEventListener('click', () => {
+          document.getElementById('fieldSelect').value = column;
+          document.getElementById('keywordInput').value = v;
+          hideValueDropdown();
+          renderTable();
+        });
+        dropdown.appendChild(item);
+      }
+    }
+
+    const rect = anchorEl.getBoundingClientRect();
+    dropdown.style.left = (rect.left + window.scrollX) + 'px';
+    dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+    dropdown.style.display = 'block';
+  }
+
+  function hideValueDropdown() {
+    document.getElementById('valueDropdown').style.display = 'none';
+  }
+
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('valueDropdown');
+    if (dropdown.style.display === 'none') return;
+    if (!dropdown.contains(e.target) && !e.target.classList.contains('clickable-header')) {
+      hideValueDropdown();
+    }
+  });
+
+  function rebuildHeaderAndDropdown() {
+    const headerRow = document.getElementById('headerRow');
+    headerRow.innerHTML = '';
+    const currentField = document.getElementById('fieldSelect').value;
+
+    for (const c of columns) {
+      const th = document.createElement('th');
+      th.textContent = c;
+      if (COLUMN_WIDTHS[c]) th.style.width = COLUMN_WIDTHS[c] + '%';
+      if (NOWRAP_FIELDS.includes(c)) th.classList.add('nowrap-col');
+      if (QUICK_FILTER_FIELDS.includes(c)) {
+        th.classList.add('clickable-header');
+        if (c === currentField) th.classList.add('active-field');
+        th.title = '點一下：用「' + c + '」欄位篩選，並可從清單選擇現有的值';
+        th.addEventListener('click', (e) => {
+          const fieldSelect = document.getElementById('fieldSelect');
+          fieldSelect.value = c;
+          renderTable();
+          showValueDropdown(c, th);
+          e.stopPropagation();
+        });
+      }
+      headerRow.appendChild(th);
+    }
+
+    const fieldSelect = document.getElementById('fieldSelect');
+    const currentVal = fieldSelect.value;
+    fieldSelect.innerHTML = '<option value="__all__">全部欄位</option>';
+    for (const c of columns) {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      fieldSelect.appendChild(opt);
+    }
+    if (Array.from(fieldSelect.options).some(o => o.value === currentVal)) {
+      fieldSelect.value = currentVal;
+    }
+  }
+
+  function makeRow(flat, extraClass) {
+    const tr = document.createElement('tr');
+    tr.className = extraClass || getRemarkClass(flat);
+    for (const c of columns) {
+      const td = document.createElement('td');
+
+      if (COMBINED_CODE_FIELDS[c]) {
+        const idVal = flat[c] ?? '';
+        const icaoVal = flat[COMBINED_CODE_FIELDS[c]] ?? '';
+        const line1 = document.createElement('div');
+        line1.textContent = icaoVal || '-';
+        line1.style.fontWeight = '600';
+        const line2 = document.createElement('div');
+        line2.textContent = idVal || '-';
+        line2.style.fontSize = '11px';
+        line2.style.color = '#6b7280';
+        td.appendChild(line1);
+        td.appendChild(line2);
+      } else {
+        let val = flat[c] ?? '';
+        if (UTC_DATETIME_FIELDS.includes(c)) {
+          val = formatUTCDisplay(val);
+        }
+        td.textContent = val;
+      }
+      if (c === '航空公司代碼') td.style.textAlign = 'right';
+      if (NOWRAP_FIELDS.includes(c)) td.classList.add('nowrap-col');
+      tr.appendChild(td);
+    }
+    return tr;
+  }
+
+  // 比對某欄位是否符合關鍵字；針對合併代碼欄位，同時比對原本代碼與 ICAO 兩種值
+  function fieldMatchesKeyword(flat, field, keywordLower) {
+    if (COMBINED_CODE_FIELDS[field]) {
+      const idVal = String(flat[field] ?? '').toLowerCase();
+      const icaoVal = String(flat[COMBINED_CODE_FIELDS[field]] ?? '').toLowerCase();
+      return idVal.includes(keywordLower) || icaoVal.includes(keywordLower);
+    }
+    return String(flat[field] ?? '').toLowerCase().includes(keywordLower);
+  }
+
+  function renderTable() {
+    const fieldSelect = document.getElementById('fieldSelect');
+    const keyword = document.getElementById('keywordInput').value.trim().toLowerCase();
+    const field = fieldSelect.value;
+
+    document.querySelectorAll('#headerRow th.clickable-header').forEach(th => {
+      th.classList.toggle('active-field', th.textContent === field);
+    });
+
+    const bodyRows = document.getElementById('bodyRows');
+    bodyRows.innerHTML = '';
+
+    const matched = [];
+    for (const flat of flatRows) {
+      let match = true;
+      if (keyword) {
+        if (field === '__all__') {
+          match = columns.some(c => fieldMatchesKeyword(flat, c, keyword));
+        } else {
+          match = fieldMatchesKeyword(flat, field, keyword);
+        }
+      }
+      if (match) matched.push(flat);
+    }
+
+    const sortedMatched = sortByScheduleTime(matched);
+
+    const cancelledRows = sortedMatched.filter(f => isCancelled(f));
+    const departedRows = sortedMatched.filter(f => !isCancelled(f) && isDepartedOrArrived(f));
+    const normalRows = sortedMatched.filter(f => !isCancelled(f) && !isDepartedOrArrived(f));
+
+    if (cancelledRows.length > 0) {
+      const toggleTr = document.createElement('tr');
+      toggleTr.className = 'cancelled-toggle-row';
+      const td = document.createElement('td');
+      td.colSpan = columns.length || 1;
+      td.textContent = (cancelledExpanded ? '▼ ' : '▶ ') +
+        '已折疊 ' + cancelledRows.length + ' 筆「取消」資料，點此' + (cancelledExpanded ? '收合' : '展開');
+      toggleTr.appendChild(td);
+      toggleTr.addEventListener('click', () => {
+        cancelledExpanded = !cancelledExpanded;
+        renderTable();
+      });
+      bodyRows.appendChild(toggleTr);
+
+      if (cancelledExpanded) {
+        for (const flat of cancelledRows) {
+          bodyRows.appendChild(makeRow(flat, 'cancelled-row'));
+        }
+      }
+    }
+
+    if (departedRows.length > 0) {
+      const toggleTr = document.createElement('tr');
+      toggleTr.className = 'departed-toggle-row';
+      const td = document.createElement('td');
+      td.colSpan = columns.length || 1;
+      td.textContent = (departedExpanded ? '▼ ' : '▶ ') +
+        '已折疊 ' + departedRows.length + ' 筆「出發/已到」資料，點此' + (departedExpanded ? '收合' : '展開');
+      toggleTr.appendChild(td);
+      toggleTr.addEventListener('click', () => {
+        departedExpanded = !departedExpanded;
+        renderTable();
+      });
+      bodyRows.appendChild(toggleTr);
+
+      if (departedExpanded) {
+        for (const flat of departedRows) {
+          bodyRows.appendChild(makeRow(flat, 'departed-row'));
+        }
+      }
+    }
+
+    for (const flat of normalRows) {
+      bodyRows.appendChild(makeRow(flat));
+    }
+
+    document.getElementById('countInfo').textContent =
+      `符合 ${matched.length} 筆 / 共 ${flatRows.length} 筆` +
+      (departedRows.length > 0 ? `（出發/已到 ${departedRows.length} 筆）` : '') +
+      (cancelledRows.length > 0 ? `（已取消 ${cancelledRows.length} 筆）` : '');
+    document.getElementById('emptyMsg').style.display = (flatRows.length === 0) ? 'block' : 'none';
+  }
+
+  function applyData() {
+    flatRows = Array.isArray(window.FLIGHT_DATA) ? window.FLIGHT_DATA : [];
+
+    if (!columnsBuilt) {
+      columns = DISPLAY_COLUMNS;
+      rebuildHeaderAndDropdown();
+      columnsBuilt = true;
+    }
+
+    document.getElementById('updateTime').textContent = taiwanTimeStrToUTC(window.FLIGHT_DATA_TIME);
+
+    // 預設只顯示今天(表訂日期)的資料，只在第一次成功載入資料時套用一次，
+    // 之後使用者自行調整的篩選條件不會被自動覆蓋掉。
+    if (!defaultFilterApplied && flatRows.length > 0) {
+      document.getElementById('fieldSelect').value = '表訂日期';
+      document.getElementById('keywordInput').value = todayStr();
+      defaultFilterApplied = true;
+    }
+
+    renderTable();
+  }
+
+  // 動態重新載入 flights_data_tpe.js（用 <script src> 避開 file:// 下 fetch 的 CORS 限制）
+  function loadDataScript() {
+    const old = document.getElementById('dataScript');
+    if (old) old.remove();
+    const s = document.createElement('script');
+    s.id = 'dataScript';
+    s.src = 'flights_data_tpe.js?t=' + Date.now();
+    s.onload = applyData;
+    s.onerror = () => {
+      document.getElementById('updateTime').textContent = '讀取失敗（找不到 flights_data_tpe.js）';
+    };
+    document.body.appendChild(s);
+  }
+
+  document.getElementById('keywordInput').addEventListener('input', renderTable);
+  document.getElementById('fieldSelect').addEventListener('change', renderTable);
+  document.getElementById('todayBtn').addEventListener('click', () => {
+    document.getElementById('fieldSelect').value = '表訂日期';
+    document.getElementById('keywordInput').value = todayStr();
+    renderTable();
+  });
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    document.getElementById('keywordInput').value = '';
+    document.getElementById('fieldSelect').value = '__all__';
+    renderTable();
+  });
+  document.getElementById('refreshBtn').addEventListener('click', loadDataScript);
+
+  // scripts/fetch_flights_tpe.py 寫入的 window.FLIGHT_DATA_TIME 是「台灣時間(UTC+8)」的 "yyyy-MM-dd HH:mm:ss" 字串，
+  // 這裡換算成 UTC 顯示在畫面右上角的「最後更新時間」
+  function taiwanTimeStrToUTC(str) {
+    const m = String(str ?? '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
+    if (!m) return str || '-';
+    const utcMillis = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) - 8 * 60 * 60 * 1000;
+    const d = new Date(utcMillis);
+    const y = d.getUTCFullYear();
+    const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const da = String(d.getUTCDate()).padStart(2, '0');
+    const h = String(d.getUTCHours()).padStart(2, '0');
+    const mi = String(d.getUTCMinutes()).padStart(2, '0');
+    const s = String(d.getUTCSeconds()).padStart(2, '0');
+    return `${y}-${mo}-${da} ${h}:${mi}:${s} UTC`;
+  }
+
+  function updateUtcClock() {
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const mo = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(now.getUTCDate()).padStart(2, '0');
+    const h = String(now.getUTCHours()).padStart(2, '0');
+    const mi = String(now.getUTCMinutes()).padStart(2, '0');
+    const s = String(now.getUTCSeconds()).padStart(2, '0');
+    document.getElementById('utcNow').textContent = `${y}-${mo}-${d} ${h}:${mi}:${s}`;
+  }
+
+  updateUtcClock();
+  setInterval(updateUtcClock, 1000); // 每秒更新畫面右上角目前 UTC 時間
+
+  loadDataScript();
+  setInterval(loadDataScript, 60000); // 每 1 分鐘自動刷新畫面資料
+</script>
+
+</body>
+</html>
