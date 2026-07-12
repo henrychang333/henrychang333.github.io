@@ -1,0 +1,46 @@
+name: TPE Flight Data Update 
+
+on:
+  schedule:
+    # 每 15 分鐘執行一次（UTC 時間，GitHub 的排程觸發時間不保證絕對準時，
+    # 尖峰時段可能會有數分鐘延遲，這是 GitHub Actions 免費排程的已知限制）
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}   # 允許在 GitHub 網頁上手動點擊執行，方便測試
+
+permissions:
+  contents: write   # 要 push 更新後的 flights_data_tpe.js 回 repo，需要寫入權限
+
+concurrency:
+  group: fetch-flights
+  cancel-in-progress: false   # 避免同時有兩次排程重疊執行、互相搶著 push
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch flight data
+        run: python scripts/fetch_flights_tpe.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/flights_data_tpe.js
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update TPE flight data ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push
+          fi
