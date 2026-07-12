@@ -44,7 +44,9 @@ OUTPUT_JS = REPO_ROOT / "docs" / "flights_data_tpe.js"
 TZ_TAIPEI = timezone(timedelta(hours=8))  # 台灣時間 = UTC+8（全年固定，無日光節約時間）
 
 # column.txt 欄位1、欄位2 的代碼對照
-TERMINAL_MAP = {"1": "第一航廈", "2": "第二航廈"}
+# 航廈欄位：來源實際內容是「第一航廈／第二航廈／第三航廈」這種完整文字，
+# 這裡把它簡化顯示成「1／2／3」
+TERMINAL_MAP = {"第一航廈": "1", "第二航廈": "2", "第三航廈": "3"}
 TYPE_MAP = {"A": "入境", "D": "出境"}
 
 # 輸出到 flights_data_tpe.js 時，每一筆資料要包含的欄位（順序即輸出順序）
@@ -199,7 +201,7 @@ def parse_csv_rows(text: str) -> list[list[str]]:
 def build_record(row: list[str], airport_map: dict, airline_map: dict) -> dict:
     rec: dict[str, str] = {}
 
-    # 欄位1 航廈 代碼1:第一航廈 代碼2:第二航廈
+    # 欄位1 航廈：來源實際內容是「第一航廈/第二航廈/第三航廈」，簡化顯示成 1/2/3
     term_code = row[0]
     rec["航廈代碼"] = term_code
     rec["航廈"] = TERMINAL_MAP.get(term_code, term_code)
