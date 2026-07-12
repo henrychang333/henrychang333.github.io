@@ -66,6 +66,18 @@ def log(msg: str) -> None:
     print(msg, flush=True)
 
 
+def _root_namespace(root: ET.Element) -> str:
+    """取得 XML 根元素的命名空間網址（若有的話）。
+    airport.xml / airline.xml 的根元素有宣告 xmlns（例如
+    xmlns="https://ptx.transportdata.tw/standard/schema/"），底下所有標籤
+    其實都帶著這個命名空間，ElementTree 比對標籤時必須完全比對含命名空間的
+    完整標籤（"{命名空間}標籤名"）才抓得到，所以這裡直接從根元素的 tag
+    動態取出命名空間網址，不寫死網址，之後來源網址若改變也不用動程式碼。
+    """
+    m = re.match(r"^\{(.*)\}", root.tag)
+    return m.group(1) if m else ""
+
+
 # ============================================================================
 #  讀取 airport.xml -> 建立 AirportID -> AirportICAO 對照表
 # ============================================================================
@@ -75,9 +87,12 @@ def load_airport_map() -> dict:
         log(f"警告：找不到 {AIRPORT_XML}")
         return mapping
     tree = ET.parse(AIRPORT_XML)
-    for airport in tree.getroot().iter("Airport"):
-        airport_id = (airport.findtext("AirportID") or "").strip()
-        airport_icao = (airport.findtext("AirportICAO") or "").strip()
+    root = tree.getroot()
+    ns = _root_namespace(root)
+    tag = lambda name: f"{{{ns}}}{name}" if ns else name
+    for airport in root.iter(tag("Airport")):
+        airport_id = (airport.findtext(tag("AirportID")) or "").strip()
+        airport_icao = (airport.findtext(tag("AirportICAO")) or "").strip()
         if airport_id:
             mapping[airport_id] = airport_icao
     log(f"airport.xml 載入完成，共 {len(mapping)} 筆機場代碼。")
@@ -93,9 +108,12 @@ def load_airline_map() -> dict:
         log(f"警告：找不到 {AIRLINE_XML}")
         return mapping
     tree = ET.parse(AIRLINE_XML)
-    for airline in tree.getroot().iter("Airline"):
-        airline_id = (airline.findtext("AirlineID") or "").strip()
-        airline_icao = (airline.findtext("AirlineICAO") or "").strip()
+    root = tree.getroot()
+    ns = _root_namespace(root)
+    tag = lambda name: f"{{{ns}}}{name}" if ns else name
+    for airline in root.iter(tag("Airline")):
+        airline_id = (airline.findtext(tag("AirlineID")) or "").strip()
+        airline_icao = (airline.findtext(tag("AirlineICAO")) or "").strip()
         if airline_id:
             mapping[airline_id] = airline_icao
     log(f"airline.xml 載入完成，共 {len(mapping)} 筆航空公司代碼。")
