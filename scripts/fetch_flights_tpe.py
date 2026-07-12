@@ -30,7 +30,7 @@ from pathlib import Path
 import requests
 
 # ------------------------- 設定 -------------------------
-CSV_URL = "https://www.taoyuan-airport.com/uploads/flightx/af_flight_v4.txt"
+CSV_URL = "https://www.taoyuan-airport.com/uploads/flightx/a_flight_v4.txt"
 
 # CSV 來源的文字編碼。已實測確認來源為 Big5，若之後來源改版導致中文亂碼，
 # 可以改成 "utf-8" 或其他編碼試試。
