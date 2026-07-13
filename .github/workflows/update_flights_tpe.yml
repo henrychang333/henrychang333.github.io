@@ -1,4 +1,4 @@
-name: TPE Flight Data Update 
+name: Update TP FIDS Data
 
 on:
   schedule:
