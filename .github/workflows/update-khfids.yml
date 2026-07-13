@@ -5,7 +5,7 @@ on:
     # 每 5 分鐘觸發一次。
     # 注意：GitHub Actions 的 schedule 建議最小間隔為 5 分鐘，
     # 且系統忙碌時實際觸發時間可能會延遲數分鐘，並非精準即時。
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch: {}   # 允許在 GitHub 網頁上手動點擊執行，方便測試
 
 permissions:
