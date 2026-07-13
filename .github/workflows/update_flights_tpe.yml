@@ -2,9 +2,9 @@ name: Update TP FIDS Data
 
 on:
   schedule:
-    # 每 15 分鐘執行一次（UTC 時間，GitHub 的排程觸發時間不保證絕對準時，
+    # 每 20 分鐘執行一次（UTC 時間，GitHub 的排程觸發時間不保證絕對準時，
     # 尖峰時段可能會有數分鐘延遲，這是 GitHub Actions 免費排程的已知限制）
-    - cron: '*/15 * * * *'
+    - cron: '*/20 * * * *'
   workflow_dispatch: {}   # 允許在 GitHub 網頁上手動點擊執行，方便測試
 
 permissions:
