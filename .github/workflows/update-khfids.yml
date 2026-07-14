@@ -26,7 +26,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-        # 不需要 pip install 任何套件，update_data.py 只用 Python 標準函式庫
+      
+      - name: Install dependencies
+        run: |
+          pip install pandas requests
 
       - name: Run update script
         run: python scripts/update_khfids_data.py
