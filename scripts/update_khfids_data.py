@@ -3,319 +3,201 @@
 """
 update_data.py
 ================
-高雄機場出境電子看板 - 後端資料更新程式
-
-目錄結構（部署到 GitHub Pages 時的慣例）：
-    repo 根目錄/
-      ├─ scripts/update_data.py      ← 本檔案
-      ├─ .cache/khfids/              ← 資料檔存放處
-      │    ├─ iata_icao_override.json  （手動維護，需自行先建立/提交）
-      │    ├─ data.js                  （本程式產生）
-      │    └─ update.log               （本程式產生）
-      └─ docs/                       ← GitHub Pages 發布目錄
-           ├─ dashboard.html
-           └─ data.js                （本程式會自動從 .cache/khfids/ 複製一份過來）
-
-功能：
-  1. 抓取 https://ccc.kia.gov.tw/fids/json/web/dep.php，取出 FDATE 為「今天」的資料
-  2. 抓取 https://www.kia.gov.tw/data/airline2.json，將 airLineNum 前2碼(IATA航空公司代碼)
-     替換為對應的3碼 ICAO 代碼
-  3. 抓取 https://www.kia.gov.tw/data/airport2.json，將 ArrivalAirportIATA(3碼)
-     替換為對應的4碼 ICAO 機場代碼
-  4. 若 .cache/khfids/iata_icao_override.json 手動對照表中有該3碼機場代碼，
-     優先使用手動對照表的結果，找不到才使用 airport2.json 的結果
-  5. 將整理好的結果寫入 .cache/khfids/data.js，並自動複製一份到 docs/data.js
-     （供 GitHub Pages 上的 dashboard.html 讀取顯示）
-
-使用方式：
-  單次執行（適合搭配 cron / 排程器 / GitHub Actions）：
-      python3 scripts/update_data.py
-
-  持續迴圈執行（適合直接背景常駐，例如搭配 systemd 或 nohup；不建議用於 GitHub Actions）：
-      python3 scripts/update_data.py --loop 30      # 每 30 秒更新一次
-
-注意：
-  - 寫檔採「先寫暫存檔，再原子性 rename」的方式，避免前端讀到寫一半的檔案。
-  - 若抓取失敗，會保留舊的 data.js 不動，並把錯誤訊息寫進 update.log，方便排查。
+高雄機場出境電子看板 - 後端資料更新程式（Python 版本）
 """
 
-import json
+import os
 import sys
-import ssl
-import time
+import re
+import json
 import argparse
-import urllib.request
-import urllib.error
-from datetime import datetime, timezone, timedelta
+import time
+from datetime import datetime
 from pathlib import Path
+import xml.etree.ElementTree as ET
+import requests
 
-# ------------------------- 基本設定 -------------------------
-
-DEP_URL = "https://ccc.kia.gov.tw/fids/json/web/dep.php"
-AIRLINE_URL = "https://www.kia.gov.tw/data/airline2.json"
-AIRPORT_URL = "https://www.kia.gov.tw/data/airport2.json"
-
-# 本檔案放在 repo 的 scripts/ 目錄下，往上一層就是 repo 根目錄
-SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parent
-
-# 資料檔（含手動對照表、log）統一放在 .cache/khfids/ 目錄
-CACHE_DIR = REPO_ROOT / ".cache" / "khfids"
-CACHE_DIR.mkdir(parents=True, exist_ok=True)  # 確保目錄存在（git 不會追蹤空目錄）
-
-OVERRIDE_FILE = CACHE_DIR / "iata_icao_override.json"
-# 輸出成 .js（而非 .json）：內容是 window.FIDS_DATA = {...}; 這種可執行的 JS 賦值語法，
-# 讓 dashboard.html 用 <script src="data.js"> 載入，不受瀏覽器對 fetch()/XHR 讀取本機檔案的限制。
+# 基礎路徑設定
+BASE_DIR = Path(__file__).resolve().parent
+CACHE_DIR = BASE_DIR / ".cache" / "khfids"
 OUTPUT_FILE = CACHE_DIR / "data.js"
 OUTPUT_TMP = CACHE_DIR / "data.js.tmp"
-LOG_FILE = CACHE_DIR / "update.log"
 
-# GitHub Pages 實際發布的目錄（Pages 設定為 "/docs" 時，只有這個目錄底下的檔案會被發布）。
-# dashboard.html 放在這裡，所以每次更新完 .cache/khfids/data.js 後，
-# 還要再複製一份到 docs/data.js，網頁才讀得到最新資料。
-DOCS_DIR = REPO_ROOT / "docs"
-DOCS_DATA_FILE = DOCS_DIR / "data.js"
+# 專案根目錄下的 docs/ 資料夾
+DOCS_DIR = BASE_DIR.parent / "docs"
+DOCS_DATA_FILE = DOCS_DIR / "flights_data_kh.js"
 
-TW_TZ = timezone(timedelta(hours=8))  # 台灣時間 UTC+8
+# 資料來源網址
+DEP_URL = "https://ccc.kia.gov.tw/fids/json/TT/dep.php"
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; KIA-FIDS-Dashboard/1.0)",
-    "Accept": "application/json,text/plain,*/*",
-}
+# 對照表檔案路徑（已依據需求改為指向 repo 根目錄下的 data 子資料夾）
+AIRPORT_XML_PATH = BASE_DIR.parent / "data" / "airport.xml"
+OVERRIDE_FILE_PATH = BASE_DIR.parent / "data" / "iata_icao_override.json"
 
-
-REQUEST_TIMEOUT = 15   # 秒
-MAX_RETRIES = 3        # 5xx / 連線失敗時最多重試次數（不含第一次嘗試）
-RETRY_BACKOFF_SECONDS = 5  # 每次重試間隔（秒），採固定間隔，第N次重試等待 N * 此秒數
-
-# 部分 .gov.tw 網站使用「政府憑證管理中心(GRCA)」簽發的憑證，
-# 這類憑證缺少新版 OpenSSL/Python 要求的 Subject Key Identifier 等擴充欄位，
-# 在較新的 Python/OpenSSL 版本下會被判定為「憑證格式不合格」而直接拒絕連線
-# （錯誤訊息類似：CERTIFICATE_VERIFY_FAILED: Missing Subject Key Identifier），
-# 這跟連線來源、網路環境無關，是憑證本身格式的相容性問題。
-#
-# 這裡的處理方式是：只針對「憑證驗證」這一關放寬（不驗證憑證鏈/不比對主機名稱），
-# 但連線本身仍然是走 HTTPS 加密。由於這裡抓的是機場公開開放資料（非機敏資訊），
-# 可以接受這樣的取捨；若之後想改成更嚴謹的作法，可以改成明確載入 GRCA 的根憑證
-# （可從 https://grca.nat.gov.tw/ 取得）讓驗證維持嚴格模式、只额外信任這個根憑證。
-INSECURE_SSL_CONTEXT = ssl._create_unverified_context()
-
-
-# ------------------------- 共用工具函式 -------------------------
 
 def log(msg: str):
-    line = f"[{datetime.now(TW_TZ).isoformat()}] {msg}"
+    now = datetime.now().isoformat()
+    line = f"[{now}] {msg}"
     print(line)
+
+
+def load_override_map(path: Path) -> dict:
+    override_map = {}
+    if not path.exists():
+        return override_map
     try:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
-    except OSError:
-        pass
-
-
-def fetch_json(url: str):
-    last_error = None
-
-    for attempt in range(1, MAX_RETRIES + 2):  # 第一次嘗試 + 最多 MAX_RETRIES 次重試
-        req = urllib.request.Request(url, headers=HEADERS)
-        try:
-            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT, context=INSECURE_SSL_CONTEXT) as resp:
-                raw = resp.read()
-            break  # 成功就跳出重試迴圈
-
-        except urllib.error.HTTPError as e:
-            body_snippet = ""
-            try:
-                body_snippet = e.read().decode("utf-8", errors="replace")[:500]
-            except Exception:
-                pass
-            last_error = RuntimeError(
-                f"HTTP {e.code} {e.reason} - URL: {url}"
-                + (f" - 回應內容前500字: {body_snippet}" if body_snippet else "（回應內容為空）")
-            )
-            # 4xx 通常代表持續性拒絕（例如被擋、網址錯誤），重試也不會變好，直接放棄
-            if 400 <= e.code < 500:
-                raise last_error from e
-            # 5xx 視為可能的暫時性錯誤，值得重試
-            if attempt <= MAX_RETRIES:
-                log(f"第 {attempt} 次嘗試失敗（{e.code}），{RETRY_BACKOFF_SECONDS * attempt} 秒後重試 - {url}")
-                time.sleep(RETRY_BACKOFF_SECONDS * attempt)
-                continue
-            raise last_error from e
-
-        except urllib.error.URLError as e:
-            last_error = RuntimeError(f"連線失敗 - URL: {url} - 原因: {e.reason}")
-            if attempt <= MAX_RETRIES:
-                log(f"第 {attempt} 次嘗試連線失敗，{RETRY_BACKOFF_SECONDS * attempt} 秒後重試 - {url}")
-                time.sleep(RETRY_BACKOFF_SECONDS * attempt)
-                continue
-            raise last_error from e
-
-    # 有些政府網站的 JSON 檔含 BOM 或非標準編碼，這裡做寬鬆處理
-    text = raw.decode("utf-8-sig", errors="replace")
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(
-            f"JSON 解析失敗 - URL: {url} - 回應內容前500字: {text[:500]}"
-        ) from e
-
-
-def extract_list(payload):
-    """
-    保守處理回應格式：
-    有些 API 直接回傳陣列 [...]；有些會包一層物件 {"data": [...]} 之類。
-    """
-    if isinstance(payload, list):
-        return payload
-    if isinstance(payload, dict):
-        for key in ("data", "Data", "DATA", "list", "List", "rows", "Rows", "result", "Result"):
-            if key in payload and isinstance(payload[key], list):
-                return payload[key]
-        for v in payload.values():
-            if isinstance(v, list):
-                return v
-    raise ValueError("無法從回應內容中找到資料陣列，來源 JSON 結構可能已變更")
-
-
-def normalize_date_digits(s) -> str:
-    """把日期字串中的非數字字元去掉，例如 '2026-07-04' 或 '2026/07/04' -> '20260704'"""
-    if s is None:
-        return ""
-    digits = "".join(ch for ch in str(s) if ch.isdigit())
-    return digits[:8]
-
-
-# ------------------------- 對照表建立 -------------------------
-
-def build_airline_map(airline_list):
-    """AirlineIATA(2碼) -> AirlineICAO(3碼)"""
-    m = {}
-    for item in airline_list:
-        iata = str(item.get("AirlineIATA", "")).strip().upper()
-        icao = str(item.get("AirlineICAO", "")).strip().upper()
-        if iata and icao:
-            m[iata] = icao
-    return m
-
-
-def build_airport_map(airport_list):
-    """IATA(3碼) -> ICAO(4碼)，來自 airport2.json"""
-    m = {}
-    for item in airport_list:
-        iata = str(item.get("IATA", "")).strip().upper()
-        icao = str(item.get("ICAO", "")).strip().upper()
-        if iata and icao:
-            m[iata] = icao
-    return m
-
-
-def load_override_map():
-    """讀取手動維護的 IATA -> ICAO 對照表，格式為簡單的 { "IATA3碼": "ICAO4碼", ... }"""
-    if OVERRIDE_FILE.exists():
-        with open(OVERRIDE_FILE, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return {str(k).strip().upper(): str(v).strip().upper() for k, v in data.items()}
-    return {}
+            for k, v in data.items():
+                if not k.startswith("_"):
+                    override_map[k.strip().upper()] = v.strip().upper()
+    except Exception as e:
+        log(f"載入 iata_icao_override.json 失敗: {e}")
+    return override_map
 
 
-# ------------------------- 代碼轉換邏輯 -------------------------
+def load_airport_xml_map(path: Path) -> dict:
+    airport_map = {}
+    if not path.exists():
+        log(f"警告：找不到 airport.xml，預期路徑為: {path}")
+        return airport_map
 
-def convert_airline_num(air_line_num, airline_map: dict) -> str:
-    """
-    把 airLineNum 前2碼(IATA航空代碼) 換成 airline2.json 對應的3碼 ICAO 代碼。
-    例如 CI0012 -> CAL0012（若 CI 對應到 CAL）。
-    找不到對照時，原樣保留。
-    """
-    if not air_line_num:
-        return air_line_num
-    s = str(air_line_num).strip()
-    prefix2 = s[:2].upper()
-    rest = s[2:]
-    icao3 = airline_map.get(prefix2)
-    if icao3:
-        return icao3 + rest
-    return s
-
-
-def convert_airport_code(iata3, override_map: dict, airport_map: dict) -> str:
-    """
-    把 ArrivalAirportIATA(3碼) 換成4碼 ICAO 代碼。
-    優先查手動對照表 override_map，找不到才查 airport2.json 的 airport_map。
-    兩邊都找不到則原樣保留3碼。
-    """
-    if not iata3:
-        return iata3
-    code = str(iata3).strip().upper()
-    if code in override_map:
-        return override_map[code]
-    if code in airport_map:
-        return airport_map[code]
-    return code
+    try:
+        tree = ET.parse(path)
+        root = tree.getroot()
+        
+        ns = ""
+        m = re.match(r'\{.*\}', root.tag)
+        if m:
+            ns = m.group(0)
+            
+        for airport in root.findall(f'{ns}Airport'):
+            iata_node = airport.find(f'{ns}AirportIATA')
+            icao_node = airport.find(f'{ns}AirportICAO')
+            
+            if iata_node is not None and icao_node is not None:
+                iata = (iata_node.text or "").strip().upper()
+                icao = (icao_node.text or "").strip().upper()
+                if iata and icao:
+                    airport_map[iata] = icao
+                    
+        log(f"airport.xml 載入完成，共解析出 {len(airport_map)} 筆機場對照資料。")
+    except Exception as e:
+        log(f"解析 airport.xml 失敗: {e}")
+        
+    return airport_map
 
 
-# ------------------------- 主要流程 -------------------------
+def convert_airline_num(num_str: str, airline_code: str) -> str:
+    if not num_str:
+        return ""
+    code = (airline_code or "").strip()
+    if not code:
+        return num_str
+    return code + num_str[2:]
 
-def build_dashboard_data():
-    dep_payload = fetch_json(DEP_URL)
-    airline_payload = fetch_json(AIRLINE_URL)
-    airport_payload = fetch_json(AIRPORT_URL)
 
-    dep_list = extract_list(dep_payload)
-    airline_list = extract_list(airline_payload)
-    airport_list = extract_list(airport_payload)
+def resolve_arrival_icao(iata3: str, api_icao: str, override_map: dict, airport_xml_map: dict) -> str:
+    c = (iata3 or "").strip().upper()
+    effective_icao = (api_icao or "").strip().upper()
 
-    airline_map = build_airline_map(airline_list)
-    airport_map = build_airport_map(airport_list)
-    override_map = load_override_map()
+    if c in override_map:
+        return override_map[c]
 
-    today_digits = datetime.now(TW_TZ).strftime("%Y%m%d")
+    if len(effective_icao) == 3:
+        if effective_icao in airport_xml_map:
+            return airport_xml_map[effective_icao]
 
-    rows = []
-    for item in dep_list:
-        if normalize_date_digits(item.get("FDATE")) != today_digits:
+    if c in airport_xml_map:
+        return airport_xml_map[c]
+
+    if effective_icao:
+        return effective_icao
+
+    return c
+
+
+def fetch_json(url: str) -> list:
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; KIA-FIDS-Python/1.0)",
+        "Accept": "application/json, text/plain, */*"
+    }
+    
+    resp = requests.get(url, headers=headers, timeout=15, verify=False)
+    resp.raise_for_status()
+    
+    # 解決 Unexpected UTF-8 BOM 錯誤
+    text_content = resp.content.decode('utf-8-sig')
+    return json.loads(text_content)
+
+
+def build_dashboard_data() -> dict:
+    raw_data = fetch_json(DEP_URL)
+    override_map = load_override_map(OVERRIDE_FILE_PATH)
+    airport_xml_map = load_airport_xml_map(AIRPORT_XML_PATH)
+
+    today_str = datetime.now().strftime("%Y%m%d")
+
+    processed_flights = []
+    for item in raw_data:
+        fdate_raw = item.get("FDATE", "")
+        fdate_digits = re.sub(r"\D", "", fdate_raw)[:8]
+        if fdate_digits != today_str:
             continue
 
-        rows.append({
-            "airLineNum": convert_airline_num(item.get("airLineNum", ""), airline_map),
-            "airLineNum_orig": item.get("airLineNum", ""),
-            "ArrivalAirport": convert_airport_code(
-                item.get("ArrivalAirportIATA", ""), override_map, airport_map
-            ),
-            "ArrivalAirport_orig": item.get("ArrivalAirportIATA", ""),
+        airline_num_orig = item.get("airLineNum", "")
+        airline_code = item.get("airLineCode", "")
+        arrival_iata = item.get("ArrivalAirportIATA", "")
+        arrival_api_icao = item.get("ArrivalAirportICAO", "")
+
+        airline_num = convert_airline_num(airline_num_orig, airline_code)
+        arrival_icao = resolve_arrival_icao(arrival_iata, arrival_api_icao, override_map, airport_xml_map)
+        status_dep = item.get("status_dep", item.get("statusdep", ""))
+
+        processed_flights.append({
+            "airLineNum": airline_num,
+            "airLineIATA": item.get("airLineIATA", ""),  # 已新增擷取欄位
+            "REG_NO": item.get("REG_NO", ""),
+            "ArrivalAirportICAO": arrival_icao,
+            "ArrivalAirportIATA": arrival_iata,
             "STD": item.get("STD", ""),
-            "statusdep": item.get("statusdep", ""),
-            "notedep": item.get("notedep", ""),
-            "Bay": item.get("Bay", ""),
+            "amhsETD": item.get("amhsETD", ""),
+            "status_dep": status_dep,
+            "AOBT": item.get("AOBT", ""),
+            "ATD": item.get("ATD", ""),
+            "Bay": item.get("Bay", "")
         })
 
-    # 依表定時間排序（HH:MM 格式的字串排序等同時間排序）
-    rows.sort(key=lambda r: str(r.get("STD", "")))
+    processed_flights.sort(key=lambda x: x["STD"])
 
     return {
-        "updated_at": datetime.now(TW_TZ).isoformat(),
-        "flight_date": today_digits,
-        "count": len(rows),
-        "flights": rows,
+        "updated_at": datetime.now().astimezone().isoformat(timespec='seconds'),
+        "flight_date": today_str,
+        "count": len(processed_flights),
+        "flights": processed_flights
     }
 
 
 def write_output(data: dict):
-    js_text = "window.FIDS_DATA = " + json.dumps(data, ensure_ascii=False, indent=2) + ";\n"
+    js_text = f"window.FIDS_DATA = {json.dumps(data, ensure_ascii=False, indent=2)};\n"
 
-    # 先寫進 .cache/khfids/data.js（原子性取代，避免讀到寫一半的檔案）
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_TMP, "w", encoding="utf-8") as f:
         f.write(js_text)
-    OUTPUT_TMP.replace(OUTPUT_FILE)
+    if OUTPUT_FILE.exists():
+        os.remove(OUTPUT_FILE)
+    os.rename(OUTPUT_TMP, OUTPUT_FILE)
 
-    # 若 docs/ 目錄存在（GitHub Pages 發布用的目錄），同步複製一份過去，
-    # 讓部署到 GitHub Pages 的 dashboard.html 也能讀到最新資料。
-    # 本機單獨執行、還沒有 docs/ 目錄的情況下會自動略過，不會報錯。
     if DOCS_DIR.exists():
-        docs_tmp = DOCS_DIR / "data.js.tmp"
+        docs_tmp = DOCS_DIR / "flights_data_kh.js.tmp"
         with open(docs_tmp, "w", encoding="utf-8") as f:
             f.write(js_text)
-        docs_tmp.replace(DOCS_DATA_FILE)
+        if DOCS_DATA_FILE.exists():
+            os.remove(DOCS_DATA_FILE)
+        os.rename(docs_tmp, DOCS_DATA_FILE)
 
 
 def run_once() -> bool:
@@ -324,11 +206,8 @@ def run_once() -> bool:
         write_output(data)
         log(f"更新成功，共 {data['count']} 筆航班")
         return True
-    except (RuntimeError, ValueError) as e:
+    except Exception as e:
         log(f"更新失敗：{e}")
-        return False
-    except Exception as e:  # 保底，避免排程任務因未預期例外而整個中斷
-        log(f"未預期錯誤：{e}")
         return False
 
 
@@ -336,19 +215,16 @@ def main():
     parser = argparse.ArgumentParser(description="高雄機場出境電子看板 - 資料更新程式")
     parser.add_argument(
         "--loop", type=int, default=0,
-        help="以迴圈方式每 N 秒更新一次；不指定則只執行一次（適合搭配 cron/排程器）"
+        help="以迴圈方式每 N 秒更新一次"
     )
     args = parser.parse_args()
 
-    if args.loop and args.loop > 0:
-        log(f"以迴圈模式啟動，每 {args.loop} 秒更新一次（Ctrl+C 結束）")
+    if args.loop > 0:
+        log(f"以迴圈模式啟動，每 {args.loop} 秒更新一次...")
         while True:
-            run_once()  # 迴圈模式下單次失敗不中斷程式，下一輪繼續重試
+            run_once()
             time.sleep(args.loop)
     else:
-        # 單次執行模式（cron / GitHub Actions 用）：失敗時要回傳非 0 結束碼，
-        # 這樣排程器 / CI 才能偵測到這次更新失敗（例如讓 GitHub Actions 該次執行顯示紅色，
-        # 並觸發後續設定的失敗通知或診斷步驟）。
         success = run_once()
         sys.exit(0 if success else 1)
 
