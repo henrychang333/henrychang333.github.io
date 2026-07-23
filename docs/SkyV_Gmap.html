@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WGS84 經緯度轉 Google Maps 工具</title>
+<style>
+  /* ===================== 基本版面樣式 ===================== */
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: "Segoe UI", "Microsoft JhengHei", Arial, sans-serif;
+    background-color: #f5f6f8;
+    color: #222;
+    margin: 0;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 22px;
+    margin-bottom: 10px;
+  }
+
+  .description {
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+
+  .description code {
+    background-color: #eee;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  /* ===================== textarea 樣式 ===================== */
+  #coordInput {
+    width: 100%;
+    min-height: 180px;
+    resize: both;      /* 允許使用者自由調整 textarea 大小 */
+    padding: 10px;
+    font-size: 14px;
+    font-family: Consolas, "Courier New", monospace;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background-color: #fff;
+  }
+
+  /* ===================== 按鈕區樣式 ===================== */
+  .toolbar {
+    margin: 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  #parseBtn {
+    padding: 8px 20px;
+    font-size: 14px;
+    background-color: #1a73e8;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  #parseBtn:hover {
+    background-color: #1558b0;
+  }
+
+  #clearBtn {
+    padding: 8px 20px;
+    font-size: 14px;
+    background-color: #e0e0e0;
+    color: #333;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  #clearBtn:hover {
+    background-color: #cacaca;
+  }
+
+  #statusMsg {
+    font-size: 13px;
+    color: #666;
+  }
+
+  /* ===================== 表格樣式 ===================== */
+  .table-wrapper {
+    max-height: 520px;
+    overflow: auto;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background-color: #fff;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  thead th {
+    position: sticky;   /* 表頭固定，滾動表格時保持可見 */
+    top: 0;
+    background-color: #1a73e8;
+    color: #fff;
+    text-align: left;
+    padding: 10px 12px;
+    z-index: 2;
+  }
+
+  tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e0e0e0;
+    border-right: 1px solid #f0f0f0;
+  }
+
+  tbody tr:hover {
+    background-color: #f1f6ff;   /* hover 效果 */
+  }
+
+  td.no-col {
+    width: 60px;
+    text-align: center;
+    color: #666;
+  }
+
+  td.map-col a {
+    color: #1a73e8;
+    text-decoration: none;
+  }
+
+  td.map-col a:hover {
+    text-decoration: underline;
+  }
+
+  .copy-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    background-color: #34a853;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .copy-btn:hover {
+    background-color: #2c8c46;
+  }
+
+  .copy-btn.copied {
+    background-color: #999;
+  }
+
+  .empty-row td {
+    text-align: center;
+    color: #999;
+    padding: 20px;
+  }
+
+  .error-line {
+    color: #c0392b;
+  }
+
+  /* ===================== SkyVector 座標欄位樣式 ===================== */
+  td.skyvector-col {
+    white-space: nowrap;
+  }
+
+  td.skyvector-col .skyvector-token {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 13px;
+    margin-right: 8px;
+  }
+
+  /* ===================== 路線連結區塊樣式 ===================== */
+  .route-section {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+
+  .route-section h2 {
+    font-size: 16px;
+    margin: 0 0 8px 0;
+  }
+
+  .route-section .route-hint {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 10px;
+  }
+
+  #routeLinkContainer a {
+    display: inline-block;
+    padding: 8px 16px;
+    background-color: #1a73e8;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  #routeLinkContainer a:hover {
+    background-color: #1558b0;
+  }
+
+  #routeLinkContainer .route-empty {
+    color: #999;
+    font-size: 13px;
+  }
+
+  /* ===================== 解析異常提示區塊樣式 ===================== */
+  .error-section {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background-color: #fff8f7;
+    border: 1px solid #f0b4ac;
+    border-radius: 6px;
+  }
+
+  .error-section h2 {
+    font-size: 16px;
+    margin: 0 0 8px 0;
+    color: #c0392b;
+  }
+
+  .error-section .route-hint {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 10px;
+  }
+
+  #errorList {
+    margin: 0;
+    padding-left: 20px;
+  }
+
+  #errorList li {
+    font-size: 13px;
+    color: #c0392b;
+    font-family: Consolas, "Courier New", monospace;
+    margin-bottom: 6px;
+    line-height: 1.5;
+  }
+
+  #errorList .error-detail-list {
+    margin: 4px 0 4px 4px;
+    padding-left: 18px;
+    list-style-type: circle;
+  }
+
+  #errorList .error-detail-list li {
+    color: #a5402f;
+    font-size: 12px;
+    margin-bottom: 2px;
+  }
+</style>
+</head>
+<body>
+
+  <h1>WGS84 經緯度轉 Google Maps 工具</h1>
+  <div class="description">
+    請於下方文字框貼上 ICAO WGS84 座標，支援以下五種格式並可混合貼上：<br />
+    格式1：<code>230000N 1214700E</code>　
+    格式2：<code>240118N/1213510E</code>　
+    格式3：<code>N284400E0982700-N284800E0975500-N293700E0980200</code><br />
+    格式4：<code>2836N12402E - 2836N12400E - 2752N12400E</code>（省略秒數，以 "-" 串接多組）<br />
+    格式5：<code>210652.31N 1235521.69E -</code>（秒數含小數，多行以行尾 "-" 表示接續）<br />
+    貼上或輸入內容後會自動解析（停止輸入約 0.5 秒後觸發），「解析」按鈕仍可隨時手動立即解析。<br />
+    格式錯誤的資料不會中止整體解析，且會在表格下方列出無法解析或部分解析失敗的行號與內容，方便對照調整。<br />
+    解析結果會自動附上 <a href="https://skyvector.com/" target="_blank" rel="noopener noreferrer">SkyVector</a>
+    座標格式（如 <code>420019N0880841W</code>），並可一鍵產生連接所有座標點的 SkyVector 路線連結。
+  </div>
+
+  <!-- 座標輸入區 -->
+  <textarea id="coordInput" placeholder="請貼上座標資料：格式1/格式2 每行一組；格式3/格式4 以 - 連接多組；格式5 多行可於行尾以 - 表示接續"></textarea>
+
+  <!-- 操作按鈕區 -->
+  <div class="toolbar">
+    <button id="parseBtn">解析</button>
+    <button id="clearBtn">重新整理</button>
+    <span id="statusMsg"></span>
+  </div>
+
+  <!-- 解析結果表格 -->
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th class="no-col">No</th>
+          <th>Latitude</th>
+          <th>Longitude</th>
+          <th>Google Maps</th>
+          <th>SkyVector 座標</th>
+          <th>Copy</th>
+        </tr>
+      </thead>
+      <tbody id="resultBody">
+        <tr class="empty-row">
+          <td colspan="6">尚無解析結果，請貼上座標並按下「解析」按鈕</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SkyVector 路線連結區塊 -->
+  <div class="route-section">
+    <h2>SkyVector 路線</h2>
+    <div class="route-hint">依解析結果的順序，將所有座標點串連成一條航線，點擊即可於 SkyVector 開啟。</div>
+    <div id="routeLinkContainer">
+      <span class="route-empty">尚無路線，請先解析座標</span>
+    </div>
+  </div>
+
+  <!-- 解析異常提示區塊：預設隱藏，僅在有無法解析或部分解析失敗的行時顯示 -->
+  <div id="errorSection" class="error-section" style="display: none;">
+    <h2>解析異常提示</h2>
+    <div class="route-hint">以下行內容無法完整解析，請對照格式說明調整後會自動重新解析：</div>
+    <ul id="errorList"></ul>
+  </div>
+
+<script>
+/* ============================================================
+   WGS84 經緯度轉 Google Maps 工具
+   說明：以下程式碼依功能拆分為多個模組化 function，
+         方便閱讀與維護。
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   模組一：DMS（度分秒）轉十進位度數
+   ------------------------------------------------------------ */
+
+/**
+ * 將「度、分、秒、半球代號」轉換為十進位度數
+ * @param {number} degree - 度
+ * @param {number} minute - 分
+ * @param {number} second - 秒
+ * @param {string} hemisphere - 半球代號 (N/S/E/W)
+ * @returns {number} 十進位度數（保留六位小數）
+ */
+function convertDmsToDecimal(degree, minute, second, hemisphere) {
+  // 基本換算公式：十進位度 = 度 + 分/60 + 秒/3600
+  let decimal = degree + (minute / 60) + (second / 3600);
+
+  // 南緯（S）或西經（W）需轉換為負值
+  if (hemisphere === "S" || hemisphere === "W") {
+    decimal = -decimal;
+  }
+
+  // 保留六位小數，並轉回數字型別
+  return parseFloat(decimal.toFixed(6));
+}
+
+/* ------------------------------------------------------------
+   模組二：單一座標字串（token）解析
+   ------------------------------------------------------------ */
+
+/**
+ * 解析緯度字串，格式為 DDMM(SS) + N/S，秒數可省略、可含小數
+ * 例如：230000N（含秒）、2836N（省略秒，格式4）、210652.31N（小數秒，格式5）
+ * @param {string} token
+ * @returns {number|null} 解析成功回傳十進位緯度，失敗回傳 null
+ */
+function parseLatitudeToken(token) {
+  // 緯度格式：2位度 + 2位分 + (可省略的秒，秒可含小數) + N或S
+  const match = token.trim().match(/^(\d{2})(\d{2})(\d{2}(?:\.\d+)?)?([NS])$/);
+  if (!match) {
+    return null;
+  }
+  const degree = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const second = match[3] ? parseFloat(match[3]) : 0; // 秒數省略時預設為0
+  const hemisphere = match[4];
+
+  // 基本合理性檢查（分、秒須小於60）
+  if (minute >= 60 || second >= 60) {
+    return null;
+  }
+
+  return convertDmsToDecimal(degree, minute, second, hemisphere);
+}
+
+/**
+ * 解析經度字串，格式為 DDDMM(SS) + E/W，秒數可省略、可含小數
+ * 例如：1214700E（含秒）、12402E（省略秒，格式4）、1235521.69E（小數秒，格式5）
+ * @param {string} token
+ * @returns {number|null} 解析成功回傳十進位經度，失敗回傳 null
+ */
+function parseLongitudeToken(token) {
+  // 經度格式：3位度 + 2位分 + (可省略的秒，秒可含小數) + E或W
+  const match = token.trim().match(/^(\d{3})(\d{2})(\d{2}(?:\.\d+)?)?([EW])$/);
+  if (!match) {
+    return null;
+  }
+  const degree = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const second = match[3] ? parseFloat(match[3]) : 0; // 秒數省略時預設為0
+  const hemisphere = match[4];
+
+  // 基本合理性檢查（分、秒須小於60）
+  if (minute >= 60 || second >= 60) {
+    return null;
+  }
+
+  return convertDmsToDecimal(degree, minute, second, hemisphere);
+}
+
+/* ------------------------------------------------------------
+   模組三：格式3 專用解析（單一群組，如 N284400E0982700）
+   ------------------------------------------------------------ */
+
+/**
+ * 解析格式3的單一群組字串
+ * 格式：N/S + 6位數字（緯度DMS） + E/W + 7位數字（經度DMS）
+ * 例如：N284400E0982700
+ * @param {string} group
+ * @returns {{lat:number, lon:number}|null}
+ */
+function parseFormat3Group(group) {
+  const match = group.trim().match(/^([NS])(\d{2})(\d{2})(\d{2})([EW])(\d{3})(\d{2})(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  const latHemisphere = match[1];
+  const latDegree = parseInt(match[2], 10);
+  const latMinute = parseInt(match[3], 10);
+  const latSecond = parseInt(match[4], 10);
+
+  const lonHemisphere = match[5];
+  const lonDegree = parseInt(match[6], 10);
+  const lonMinute = parseInt(match[7], 10);
+  const lonSecond = parseInt(match[8], 10);
+
+  // 分、秒合理性檢查
+  if (latMinute >= 60 || latSecond >= 60 || lonMinute >= 60 || lonSecond >= 60) {
+    return null;
+  }
+
+  const lat = convertDmsToDecimal(latDegree, latMinute, latSecond, latHemisphere);
+  const lon = convertDmsToDecimal(lonDegree, lonMinute, lonSecond, lonHemisphere);
+
+  return { lat: lat, lon: lon };
+}
+
+/* ------------------------------------------------------------
+   模組三之二：格式4 專用解析（單一群組，如 2836N12402E）
+   ------------------------------------------------------------ */
+
+/**
+ * 解析格式4的單一群組字串
+ * 格式：緯度數字 + N/S + 經度數字 + E/W（緯經度緊接、無分隔符號，秒數可省略）
+ * 例如：2836N12402E
+ * @param {string} group
+ * @returns {{lat:number, lon:number}|null}
+ */
+function parseFormat4Group(group) {
+  const match = group.trim().match(/^(\d{2})(\d{2})(\d{2}(?:\.\d+)?)?([NS])(\d{3})(\d{2})(\d{2}(?:\.\d+)?)?([EW])$/);
+  if (!match) {
+    return null;
+  }
+
+  const latDegree = parseInt(match[1], 10);
+  const latMinute = parseInt(match[2], 10);
+  const latSecond = match[3] ? parseFloat(match[3]) : 0; // 秒數省略時預設為0
+  const latHemisphere = match[4];
+
+  const lonDegree = parseInt(match[5], 10);
+  const lonMinute = parseInt(match[6], 10);
+  const lonSecond = match[7] ? parseFloat(match[7]) : 0; // 秒數省略時預設為0
+  const lonHemisphere = match[8];
+
+  // 分、秒合理性檢查
+  if (latMinute >= 60 || latSecond >= 60 || lonMinute >= 60 || lonSecond >= 60) {
+    return null;
+  }
+
+  const lat = convertDmsToDecimal(latDegree, latMinute, latSecond, latHemisphere);
+  const lon = convertDmsToDecimal(lonDegree, lonMinute, lonSecond, lonHemisphere);
+
+  return { lat: lat, lon: lon };
+}
+
+/* ------------------------------------------------------------
+   模組四：逐組錯誤診斷（找出具體是哪一組/哪個部分、為何失敗）
+   ------------------------------------------------------------ */
+
+/**
+ * 診斷格式3單一群組失敗的原因（結構不符 或 數值超出範圍）
+ * @param {string} group
+ * @returns {string} 錯誤原因說明
+ */
+function diagnoseFormat3Group(group) {
+  const structureMatch = group.trim().match(/^([NS])(\d{2})(\d{2})(\d{2})([EW])(\d{3})(\d{2})(\d{2})$/);
+  if (!structureMatch) {
+    return "格式不符（應為 N/S+緯度6位數字+E/W+經度7位數字，例如 N284400E0982700）";
+  }
+  const latMinute = parseInt(structureMatch[3], 10);
+  const latSecond = parseInt(structureMatch[4], 10);
+  const lonMinute = parseInt(structureMatch[7], 10);
+  const lonSecond = parseInt(structureMatch[8], 10);
+  if (latMinute >= 60 || latSecond >= 60 || lonMinute >= 60 || lonSecond >= 60) {
+    return "分或秒數值需小於60";
+  }
+  return "數值超出有效範圍";
+}
+
+/**
+ * 診斷格式4單一群組失敗的原因（結構不符 或 數值超出範圍）
+ * @param {string} group
+ * @returns {string} 錯誤原因說明
+ */
+function diagnoseFormat4Group(group) {
+  const structureMatch = group.trim().match(/^(\d{2})(\d{2})(\d{2}(?:\.\d+)?)?([NS])(\d{3})(\d{2})(\d{2}(?:\.\d+)?)?([EW])$/);
+  if (!structureMatch) {
+    return "格式不符（應為 緯度4或6位數字+N/S+經度5或7位數字+E/W，例如 2836N12402E）";
+  }
+  const latMinute = parseInt(structureMatch[2], 10);
+  const latSecond = structureMatch[3] ? parseFloat(structureMatch[3]) : 0;
+  const lonMinute = parseInt(structureMatch[6], 10);
+  const lonSecond = structureMatch[7] ? parseFloat(structureMatch[7]) : 0;
+  if (latMinute >= 60 || latSecond >= 60 || lonMinute >= 60 || lonSecond >= 60) {
+    return "分或秒數值需小於60";
+  }
+  return "數值超出有效範圍";
+}
+
+/**
+ * 診斷緯度 token 失敗的原因（結構不符 或 數值超出範圍）
+ * @param {string} token
+ * @returns {string} 錯誤原因說明
+ */
+function diagnoseLatitudeToken(token) {
+  const structureMatch = token.trim().match(/^(\d{2})(\d{2})(\d{2}(?:\.\d+)?)?([NS])$/);
+  if (!structureMatch) {
+    return "緯度格式不符（應為 DDMM 或 DDMMSS + N/S）";
+  }
+  const minute = parseInt(structureMatch[2], 10);
+  const second = structureMatch[3] ? parseFloat(structureMatch[3]) : 0;
+  if (minute >= 60 || second >= 60) {
+    return "緯度的分或秒數值需小於60";
+  }
+  return "緯度數值超出有效範圍";
+}
+
+/**
+ * 診斷經度 token 失敗的原因（結構不符 或 數值超出範圍）
+ * @param {string} token
+ * @returns {string} 錯誤原因說明
+ */
+function diagnoseLongitudeToken(token) {
+  const structureMatch = token.trim().match(/^(\d{3})(\d{2})(\d{2}(?:\.\d+)?)?([EW])$/);
+  if (!structureMatch) {
+    return "經度格式不符（應為 DDDMM 或 DDDMMSS + E/W）";
+  }
+  const minute = parseInt(structureMatch[2], 10);
+  const second = structureMatch[3] ? parseFloat(structureMatch[3]) : 0;
+  if (minute >= 60 || second >= 60) {
+    return "經度的分或秒數值需小於60";
+  }
+  return "經度數值超出有效範圍";
+}
+
+/* ------------------------------------------------------------
+   模組五：整體輸入文字解析
+   ------------------------------------------------------------ */
+
+/**
+ * 格式3單一群組的正規表示式來源字串（不含 g 旗標，供組成掃描用正則）
+ * 結構：N/S + 緯度6位數字（度分秒皆固定2位） + E/W + 經度7位數字
+ */
+const FORMAT3_GROUP_SOURCE = "[NS]\\d{2}\\d{2}\\d{2}[EW]\\d{3}\\d{2}\\d{2}";
+
+/**
+ * 格式4單一群組的正規表示式來源字串（不含 g 旗標，供組成掃描用正則）
+ * 結構：緯度(2位度+2位分+可省略秒) + N/S + 經度(3位度+2位分+可省略秒) + E/W
+ */
+const FORMAT4_GROUP_SOURCE = "\\d{2}\\d{2}(?:\\d{2}(?:\\.\\d+)?)?[NS]\\d{3}\\d{2}(?:\\d{2}(?:\\.\\d+)?)?[EW]";
+
+/**
+ * 在整段文字中，找出所有符合指定座標群組結構的片段（不論群組之間使用什麼符號連接，
+ * 甚至完全沒有分隔符號），回傳每個片段的內容與其在原文字中的起訖位置。
+ * 這是偵測「分隔符號本身錯誤」的關鍵：先不管分隔符號，只找出「像座標的片段」，
+ * 再回頭檢查片段與片段之間到底夾了什麼內容。
+ * @param {string} content
+ * @param {string} groupSource - FORMAT3_GROUP_SOURCE 或 FORMAT4_GROUP_SOURCE
+ * @returns {Array<{text:string, start:number, end:number}>}
+ */
+function findGroupMatches(content, groupSource) {
+  const scanRegex = new RegExp(groupSource, "g");
+  const matches = [];
+  let match = scanRegex.exec(content);
+
+  while (match !== null) {
+    matches.push({
+      text: match[0],
+      start: match.index,
+      end: match.index + match[0].length
+    });
+    match = scanRegex.exec(content);
+  }
+
+  return matches;
+}
+
+/**
+ * 判斷兩個相鄰座標群組之間的連接文字是否為合法分隔符號（半形 "-"，前後可有空白），
+ * 若不合法，回傳具體的錯誤說明；若合法，回傳 null。
+ * @param {string} gapText - 兩個群組之間的原始文字
+ * @returns {{reason:string, type:string}|null}
+ */
+function diagnoseSeparatorGap(gapText) {
+  // 合法情況：可有可無的空白 + 一個半形 "-" + 可有可無的空白
+  if (/^\s*-\s*$/.test(gapText)) {
+    return null;
+  }
+
+  const trimmedGap = gapText.trim();
+
+  if (trimmedGap === "" && gapText === "") {
+    return { reason: "兩組座標之間缺少分隔符號「-」，兩組內容直接相連", type: "separator" };
+  }
+
+  if (trimmedGap === "") {
+    return { reason: "兩組座標之間缺少分隔符號「-」，僅偵測到空白字元", type: "separator" };
+  }
+
+  // 特殊情況：前後都是正確的 "-"，但中間夾了其他無法辨識的內容，
+  // 代表分隔符號本身沒問題，問題出在中間那段內容（很可能是一組打錯的座標）
+  const embeddedContentMatch = trimmedGap.match(/^-\s*(.+?)\s*-$/);
+  if (embeddedContentMatch) {
+    return {
+      reason: "分隔符號本身正確，但中間夾了無法辨識的內容「" + embeddedContentMatch[1] + "」",
+      type: "group"
+    };
+  }
+
+  return {
+    reason: "兩組座標之間的分隔符號有誤，偵測到「" + trimmedGap + "」，應改為半形「-」",
+    type: "separator"
+  };
+}
+
+/**
+ * 分析「多組座標串接」的整行內容（格式3、格式4皆屬此類）。
+ * 做法：不預先假設分隔符號正確，而是先在整行中掃描出所有「像座標」的片段，
+ * 再個別解析每個片段、並檢查片段與片段之間的連接文字是否為正確的分隔符號。
+ * 如此一來，即使分隔符號打錯、多了或少了空格、缺少分隔符號、混入其他符號，
+ * 都能被個別指出來，而不會讓整行、或其他原本正確的座標一併判定失敗。
+ * @param {string} content - 已去除行尾接續符號的整行內容
+ * @param {string} originalLine - 該行原始（未去尾）內容，用於畫面顯示
+ * @param {number} lineNumber - 行號
+ * @param {"format3"|"format4"} groupStyle - 座標群組風格
+ * @returns {Object} 分析結果
+ */
+function analyzeMultiGroupLine(content, originalLine, lineNumber, groupStyle) {
+  const groupSource = groupStyle === "format3" ? FORMAT3_GROUP_SOURCE : FORMAT4_GROUP_SOURCE;
+  const parseGroup = groupStyle === "format3" ? parseFormat3Group : parseFormat4Group;
+  const diagnoseGroup = groupStyle === "format3" ? diagnoseFormat3Group : diagnoseFormat4Group;
+
+  const matches = findGroupMatches(content, groupSource);
+  const coordinates = [];
+  const failedGroups = [];
+  let itemNumber = 0;
+
+  // 記錄「預期座標組數」，初始為掃描到的座標片段數。
+  // 若後續在分隔符號中間發現疑似藏了一組無法辨識的座標，會將此數字加1，
+  // 讓「成功 X / Y 組」的比例能正確反映實際情況。
+  let totalGroupCount = matches.length;
+
+  // 完全找不到任何符合結構的座標片段，整行視為無法解析
+  if (matches.length === 0) {
+    failedGroups.push({
+      index: 1,
+      text: content,
+      reason: "找不到符合「" + (groupStyle === "format3" ? "格式3" : "格式4") + "」結構的座標內容",
+      type: "group"
+    });
+
+    return {
+      lineNumber: lineNumber,
+      rawLine: originalLine,
+      coordinates: [],
+      totalGroups: 1,
+      validCount: 0,
+      status: "invalid",
+      failedGroups: failedGroups
+    };
+  }
+
+  // 檢查第一個座標片段之前，是否有多餘、無法辨識的內容
+  const leadingExtra = content.slice(0, matches[0].start).trim();
+  if (leadingExtra !== "") {
+    itemNumber++;
+    failedGroups.push({ index: itemNumber, text: leadingExtra, reason: "行首出現無法辨識的內容", type: "extra" });
+  }
+
+  matches.forEach(function (currentMatch, i) {
+    itemNumber++;
+
+    // 解析此座標片段本身
+    const parsed = parseGroup(currentMatch.text);
+    if (parsed !== null) {
+      coordinates.push(parsed);
+    } else {
+      failedGroups.push({ index: itemNumber, text: currentMatch.text, reason: diagnoseGroup(currentMatch.text), type: "group" });
+    }
+
+    // 檢查此片段與下一個片段之間的連接文字（也就是分隔符號本身）是否正確
+    if (i < matches.length - 1) {
+      const gapText = content.slice(currentMatch.end, matches[i + 1].start);
+      const gapDiagnosis = diagnoseSeparatorGap(gapText);
+
+      if (gapDiagnosis !== null) {
+        itemNumber++;
+        const gapDisplayText = gapText.trim() === "" ? "(空白)" : gapText.trim();
+        failedGroups.push({ index: itemNumber, text: gapDisplayText, reason: gapDiagnosis.reason, type: gapDiagnosis.type });
+
+        // 若中間夾的是疑似座標內容（而非單純分隔符號打錯），視為多一組預期座標
+        if (gapDiagnosis.type === "group") {
+          totalGroupCount++;
+        }
+      }
+    }
+  });
+
+  // 檢查最後一個座標片段之後，是否有多餘、無法辨識的內容
+  const lastMatch = matches[matches.length - 1];
+  const trailingExtra = content.slice(lastMatch.end).trim();
+  if (trailingExtra !== "") {
+    itemNumber++;
+    failedGroups.push({ index: itemNumber, text: trailingExtra, reason: "行尾出現無法辨識的內容", type: "extra" });
+  }
+
+  // 判斷整行狀態：全部成功 / 部分成功 / 全部失敗
+  let status;
+  if (failedGroups.length === 0) {
+    status = "valid";
+  } else if (coordinates.length > 0) {
+    status = "partial";
+  } else {
+    status = "invalid";
+  }
+
+  return {
+    lineNumber: lineNumber,
+    rawLine: originalLine,
+    coordinates: coordinates,
+    totalGroups: totalGroupCount,
+    validCount: coordinates.length,
+    status: status,
+    failedGroups: failedGroups
+  };
+}
+
+/**
+ * 分析「一行僅一組緯經度」的整行內容（格式1、格式2、格式5皆屬此類），
+ * 並在緯度或經度個別失敗時，明確指出是哪一個部分、原因為何。
+ * @param {string} content - 已去除行尾接續符號的整行內容
+ * @param {string} originalLine - 該行原始（未去尾）內容，用於畫面顯示
+ * @param {number} lineNumber - 行號
+ * @param {"slash"|"whitespace"} separatorType - 緯度與經度之間的分隔方式
+ * @returns {Object} 分析結果
+ */
+function analyzeTwoTokenLine(content, originalLine, lineNumber, separatorType) {
+  const parts = separatorType === "slash"
+    ? content.split("/").map(function (part) { return part.trim(); })
+    : content.trim().split(/\s+/);
+
+  // 分隔後不是恰好兩個部分（緯度、經度），視為整行無法解析
+  if (parts.length !== 2) {
+    return {
+      lineNumber: lineNumber,
+      rawLine: originalLine,
+      coordinates: [],
+      totalGroups: 1,
+      validCount: 0,
+      status: "invalid",
+      failedGroups: [{
+        index: 1,
+        text: content,
+        reason: "應包含緯度與經度兩個部分（以空白或 / 分隔），但偵測到 " + parts.length + " 個部分",
+        type: "group"
+      }]
+    };
+  }
+
+  const latToken = parts[0];
+  const lonToken = parts[1];
+  const lat = parseLatitudeToken(latToken);
+  const lon = parseLongitudeToken(lonToken);
+
+  const failedGroups = [];
+  if (lat === null) {
+    failedGroups.push({ index: 1, text: latToken, reason: diagnoseLatitudeToken(latToken), type: "group" });
+  }
+  if (lon === null) {
+    failedGroups.push({ index: 2, text: lonToken, reason: diagnoseLongitudeToken(lonToken), type: "group" });
+  }
+
+  // 緯度、經度須兩者都成功，才能組成一筆完整座標
+  const coordinates = (lat !== null && lon !== null) ? [{ lat: lat, lon: lon }] : [];
+
+  return {
+    lineNumber: lineNumber,
+    rawLine: originalLine,
+    coordinates: coordinates,
+    totalGroups: 2,
+    validCount: 2 - failedGroups.length,
+    status: failedGroups.length === 0 ? "valid" : "invalid",
+    failedGroups: failedGroups
+  };
+}
+
+/**
+ * 分析單一行字串，自動判斷屬於哪一種格式，並回傳詳細解析結果
+ * （包含成功座標、失敗組別的具體內容與原因），
+ * 用於在畫面上提示使用者哪一行、哪一組資料有問題，方便調整內容。
+ * @param {string} rawLine - 該行原始字串（尚未trim）
+ * @param {number} lineNumber - 行號（從1開始）
+ * @returns {Object|null} 分析結果；若為空白行則回傳 null（不視為錯誤）
+ */
+function analyzeLine(rawLine, lineNumber) {
+  const originalLine = rawLine.trim();
+
+  // 空白行不列入分析，直接略過
+  if (originalLine === "") {
+    return null;
+  }
+
+  // 格式5支援：多行座標可於行尾以 "-" 表示與下一行接續，
+  // 此處先移除行尾的 "-"（及其前方可能的空白），再依一般格式解析
+  const content = originalLine.replace(/\s*-\s*$/, "").trim();
+  if (content === "") {
+    return null;
+  }
+
+  const firstChar = content.charAt(0);
+
+  // 開頭為 N/S：視為格式3（多組座標串接），不論分隔符號是否正確都先掃描定位座標片段
+  if (firstChar === "N" || firstChar === "S") {
+    return analyzeMultiGroupLine(content, originalLine, lineNumber, "format3");
+  }
+
+  // 開頭為數字時，先掃描是否存在「緊接無分隔符號」也能辨識出的格式4座標片段。
+  // 只要掃描到至少1組，就代表使用者是想輸入格式4（可能只有一組，也可能分隔符號打錯/遺漏），
+  // 一律交給多組分析函式處理，才能連分隔符號本身的錯誤都一併檢查出來。
+  if (/^\d/.test(firstChar)) {
+    const format4Matches = findGroupMatches(content, FORMAT4_GROUP_SOURCE);
+    if (format4Matches.length > 0) {
+      return analyzeMultiGroupLine(content, originalLine, lineNumber, "format4");
+    }
+  }
+
+  // 含有 "/" 的行視為格式2
+  if (content.includes("/")) {
+    return analyzeTwoTokenLine(content, originalLine, lineNumber, "slash");
+  }
+
+  // 其餘視為格式1或格式5（以空白分隔緯度、經度）
+  return analyzeTwoTokenLine(content, originalLine, lineNumber, "whitespace");
+}
+
+/**
+ * 分析使用者貼上的完整文字內容，逐行回傳解析狀態
+ * @param {string} rawText
+ * @returns {Array<Object>} 每一個非空白行的分析結果（詳見 analyzeLine）
+ */
+function analyzeAllLines(rawText) {
+  const analyses = [];
+
+  // 依換行符號切割（相容 Windows 的 \r\n 與 Unix 的 \n）
+  const lines = rawText.split(/\r?\n/);
+
+  lines.forEach(function (line, index) {
+    const result = analyzeLine(line, index + 1);
+    if (result !== null) {
+      analyses.push(result);
+    }
+  });
+
+  return analyses;
+}
+
+/**
+ * 解析使用者貼上的完整文字內容，僅回傳所有成功解析的座標（扁平化陣列）
+ * @param {string} rawText
+ * @returns {Array<{lat:number, lon:number}>} 所有成功解析的座標
+ */
+function parseAllCoordinates(rawText) {
+  const allResults = [];
+
+  analyzeAllLines(rawText).forEach(function (analysis) {
+    analysis.coordinates.forEach(function (item) {
+      allResults.push(item);
+    });
+  });
+
+  return allResults;
+}
+
+/* ------------------------------------------------------------
+   模組六：Google Maps 連結與 Copy 文字產生
+   ------------------------------------------------------------ */
+
+/**
+ * 產生 Google Maps 連結網址
+ * @param {number} lat
+ * @param {number} lon
+ * @returns {string}
+ */
+function buildGoogleMapsUrl(lat, lon) {
+  return "https://www.google.com/maps?q=" + lat.toFixed(6) + "," + lon.toFixed(6);
+}
+
+/**
+ * 產生供複製用的座標文字，格式為 "緯度,經度"
+ * @param {number} lat
+ * @param {number} lon
+ * @returns {string}
+ */
+function buildCopyText(lat, lon) {
+  return lat.toFixed(6) + "," + lon.toFixed(6);
+}
+
+/* ------------------------------------------------------------
+   模組六之二：十進位度數轉 SkyVector 座標格式
+   SkyVector 支援的 GPS 座標格式為：
+   AA(BB)(CC)DEEE(FF)(GG)H
+   其中 AA 為緯度度數（2位）、BB 為分（2位）、CC 為秒（2位）、
+   D 為 N 或 S；EEE 為經度度數（3位）、FF 為分（2位）、
+   GG 為秒（2位）、H 為 E 或 W。
+   整組座標需以「一個連續字串」輸入，不可有分隔符號。
+   例如：420019N0880841W
+   ------------------------------------------------------------ */
+
+/**
+ * 將數字補零至指定長度
+ * @param {number} num
+ * @param {number} length
+ * @returns {string}
+ */
+function padWithZero(num, length) {
+  return String(num).padStart(length, "0");
+}
+
+/**
+ * 將十進位度數轉換為「度、分、秒」三個整數分量
+ * 秒數採四捨五入，並處理進位（60秒進1分、60分進1度）的情況
+ * @param {number} decimalDegree - 十進位度數（可為正或負）
+ * @returns {{degree:number, minute:number, second:number}}
+ */
+function convertDecimalToDmsComponents(decimalDegree) {
+  const absoluteValue = Math.abs(decimalDegree);
+
+  let degree = Math.floor(absoluteValue);
+  let minuteFull = (absoluteValue - degree) * 60;
+  let minute = Math.floor(minuteFull);
+  let second = Math.round((minuteFull - minute) * 60);
+
+  // 秒數四捨五入後可能達到60，需進位到分
+  if (second === 60) {
+    second = 0;
+    minute += 1;
+  }
+
+  // 分數進位後可能達到60，需進位到度
+  if (minute === 60) {
+    minute = 0;
+    degree += 1;
+  }
+
+  return { degree: degree, minute: minute, second: second };
+}
+
+/**
+ * 將十進位緯度轉換為 SkyVector 緯度區塊字串，例如 420019N
+ * @param {number} lat
+ * @returns {string}
+ */
+function buildSkyVectorLatToken(lat) {
+  const dms = convertDecimalToDmsComponents(lat);
+  const hemisphere = lat >= 0 ? "N" : "S";
+  return padWithZero(dms.degree, 2) + padWithZero(dms.minute, 2) + padWithZero(dms.second, 2) + hemisphere;
+}
+
+/**
+ * 將十進位經度轉換為 SkyVector 經度區塊字串，例如 0880841W
+ * @param {number} lon
+ * @returns {string}
+ */
+function buildSkyVectorLonToken(lon) {
+  const dms = convertDecimalToDmsComponents(lon);
+  const hemisphere = lon >= 0 ? "E" : "W";
+  return padWithZero(dms.degree, 3) + padWithZero(dms.minute, 2) + padWithZero(dms.second, 2) + hemisphere;
+}
+
+/**
+ * 將一組經緯度轉換為 SkyVector 完整座標字串（緯度區塊 + 經度區塊，無分隔符號）
+ * 例如：lat=42.005278, lon=-88.144722 → 420019N0880841W
+ * @param {number} lat
+ * @param {number} lon
+ * @returns {string}
+ */
+function buildSkyVectorWaypointToken(lat, lon) {
+  return buildSkyVectorLatToken(lat) + buildSkyVectorLonToken(lon);
+}
+
+/* ------------------------------------------------------------
+   模組六之三：SkyVector 路線連結產生
+   ------------------------------------------------------------ */
+
+/**
+ * 依序將多個座標點串成 SkyVector 航線連結
+ * URL 格式：https://skyvector.com/?ll=LAT,LON&chart=301&zoom=6&fpl=WP1 WP2 WP3...
+ * @param {Array<{lat:number, lon:number}>} coordinates
+ * @returns {string|null} 成功回傳完整網址，若無座標則回傳 null
+ */
+function buildSkyVectorRouteUrl(coordinates) {
+  if (!coordinates || coordinates.length === 0) {
+    return null;
+  }
+
+  // 將每個座標轉換為 SkyVector 座標區塊字串，並以空白分隔組成航線
+  const waypointTokens = coordinates.map(function (coord) {
+    return buildSkyVectorWaypointToken(coord.lat, coord.lon);
+  });
+  const fplParam = waypointTokens.join(" ");
+
+  // 地圖初始中心點使用第一個座標
+  const firstCoord = coordinates[0];
+  const llParam = firstCoord.lat.toFixed(6) + "," + firstCoord.lon.toFixed(6);
+
+  // 組合完整網址，並針對參數進行 URL 編碼
+  const url = "https://skyvector.com/?ll=" + encodeURIComponent(llParam) +
+    "&chart=304&zoom=6&fpl=" + encodeURIComponent(fplParam);
+
+  return url;
+}
+
+/* ------------------------------------------------------------
+   模組七：表格渲染
+   ------------------------------------------------------------ */
+
+/**
+ * 將解析結果渲染至表格中
+ * @param {Array<{lat:number, lon:number}>} coordinates
+ */
+function renderResultTable(coordinates) {
+  const tbody = document.getElementById("resultBody");
+
+  // 先清空現有內容
+  tbody.innerHTML = "";
+
+  // 若無任何有效資料，顯示提示列
+  if (coordinates.length === 0) {
+    const emptyRow = document.createElement("tr");
+    emptyRow.className = "empty-row";
+    const emptyCell = document.createElement("td");
+    emptyCell.colSpan = 6;
+    emptyCell.textContent = "找不到有效座標，請確認輸入格式";
+    emptyRow.appendChild(emptyCell);
+    tbody.appendChild(emptyRow);
+    return;
+  }
+
+  // 逐筆建立表格列
+  coordinates.forEach(function (coord, index) {
+    const row = createResultRow(coord.lat, coord.lon, index + 1);
+    tbody.appendChild(row);
+  });
+}
+
+/**
+ * 建立單一結果列（tr 元素）
+ * @param {number} lat
+ * @param {number} lon
+ * @param {number} rowNumber
+ * @returns {HTMLTableRowElement}
+ */
+function createResultRow(lat, lon, rowNumber) {
+  const row = document.createElement("tr");
+
+  // No 欄位
+  const noCell = document.createElement("td");
+  noCell.className = "no-col";
+  noCell.textContent = rowNumber;
+  row.appendChild(noCell);
+
+  // Latitude 欄位
+  const latCell = document.createElement("td");
+  latCell.textContent = lat.toFixed(6);
+  row.appendChild(latCell);
+
+  // Longitude 欄位
+  const lonCell = document.createElement("td");
+  lonCell.textContent = lon.toFixed(6);
+  row.appendChild(lonCell);
+
+  // Google Maps 連結欄位
+  const mapCell = document.createElement("td");
+  mapCell.className = "map-col";
+  const mapLink = document.createElement("a");
+  mapLink.href = buildGoogleMapsUrl(lat, lon);
+  mapLink.target = "_blank";
+  mapLink.rel = "noopener noreferrer";
+  mapLink.textContent = "開啟地圖";
+  mapCell.appendChild(mapLink);
+  row.appendChild(mapCell);
+
+  // SkyVector 座標欄位（顯示轉換後的字串，並提供獨立複製按鈕）
+  const skyVectorCell = document.createElement("td");
+  skyVectorCell.className = "skyvector-col";
+  const skyVectorToken = buildSkyVectorWaypointToken(lat, lon);
+
+  const skyVectorText = document.createElement("span");
+  skyVectorText.className = "skyvector-token";
+  skyVectorText.textContent = skyVectorToken;
+  skyVectorCell.appendChild(skyVectorText);
+
+  const skyVectorCopyButton = document.createElement("button");
+  skyVectorCopyButton.className = "copy-btn";
+  skyVectorCopyButton.textContent = "Copy";
+  skyVectorCopyButton.setAttribute("data-copy-text", skyVectorToken);
+  skyVectorCopyButton.addEventListener("click", handleCopyButtonClick);
+  skyVectorCell.appendChild(skyVectorCopyButton);
+
+  row.appendChild(skyVectorCell);
+
+  // Copy 按鈕欄位
+  const copyCell = document.createElement("td");
+  const copyButton = document.createElement("button");
+  copyButton.className = "copy-btn";
+  copyButton.textContent = "Copy";
+  copyButton.setAttribute("data-copy-text", buildCopyText(lat, lon));
+  copyButton.addEventListener("click", handleCopyButtonClick);
+  copyCell.appendChild(copyButton);
+  row.appendChild(copyCell);
+
+  return row;
+}
+
+/* ------------------------------------------------------------
+   模組八：複製到剪貼簿功能
+   ------------------------------------------------------------ */
+
+/**
+ * 處理 Copy 按鈕點擊事件，將座標文字複製到剪貼簿
+ * @param {Event} event
+ */
+function handleCopyButtonClick(event) {
+  const button = event.currentTarget;
+  const textToCopy = button.getAttribute("data-copy-text");
+
+  copyTextToClipboard(textToCopy, function () {
+    // 複製成功後給予視覺回饋
+    const originalText = button.textContent;
+    button.textContent = "已複製";
+    button.classList.add("copied");
+
+    setTimeout(function () {
+      button.textContent = originalText;
+      button.classList.remove("copied");
+    }, 1200);
+  });
+}
+
+/**
+ * 將文字複製到剪貼簿，優先使用 Clipboard API，失敗則使用備援方式
+ * @param {string} text
+ * @param {Function} onSuccess
+ */
+function copyTextToClipboard(text, onSuccess) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(onSuccess).catch(function () {
+      fallbackCopyTextToClipboard(text, onSuccess);
+    });
+  } else {
+    fallbackCopyTextToClipboard(text, onSuccess);
+  }
+}
+
+/**
+ * 備援複製方式，適用於不支援 Clipboard API 的瀏覽器環境
+ * @param {string} text
+ * @param {Function} onSuccess
+ */
+function fallbackCopyTextToClipboard(text, onSuccess) {
+  const tempTextarea = document.createElement("textarea");
+  tempTextarea.value = text;
+  tempTextarea.style.position = "fixed";
+  tempTextarea.style.opacity = "0";
+  document.body.appendChild(tempTextarea);
+  tempTextarea.focus();
+  tempTextarea.select();
+
+  try {
+    document.execCommand("copy");
+    if (typeof onSuccess === "function") {
+      onSuccess();
+    }
+  } catch (err) {
+    console.error("複製失敗：", err);
+  }
+
+  document.body.removeChild(tempTextarea);
+}
+
+/* ------------------------------------------------------------
+   模組七之二：SkyVector 路線連結區塊渲染
+   ------------------------------------------------------------ */
+
+/**
+ * 將 SkyVector 路線連結渲染至畫面上的連結區塊
+ * @param {Array<{lat:number, lon:number}>} coordinates
+ */
+function renderRouteLink(coordinates) {
+  const container = document.getElementById("routeLinkContainer");
+
+  // 先清空現有內容
+  container.innerHTML = "";
+
+  const routeUrl = buildSkyVectorRouteUrl(coordinates);
+
+  // 若無有效座標，顯示提示文字
+  if (routeUrl === null) {
+    const emptyMsg = document.createElement("span");
+    emptyMsg.className = "route-empty";
+    emptyMsg.textContent = "尚無路線，請先解析座標";
+    container.appendChild(emptyMsg);
+    return;
+  }
+
+  // 建立可點選的 SkyVector 路線連結
+  const routeLink = document.createElement("a");
+  routeLink.href = routeUrl;
+  routeLink.target = "_blank";
+  routeLink.rel = "noopener noreferrer";
+  routeLink.textContent = "於 SkyVector 開啟路線（共 " + coordinates.length + " 個航點）";
+  container.appendChild(routeLink);
+}
+
+/* ------------------------------------------------------------
+   模組七之三：解析異常提示區塊渲染
+   ------------------------------------------------------------ */
+
+/**
+ * 將解析異常的行渲染至畫面上的提示區塊，方便使用者對照調整內容
+ * @param {Array<Object>} analyses - analyzeAllLines() 回傳的逐行分析結果
+ */
+function renderErrorSection(analyses) {
+  const section = document.getElementById("errorSection");
+  const list = document.getElementById("errorList");
+
+  // 先清空現有內容
+  list.innerHTML = "";
+
+  // 篩選出「完全無法解析」或「部分群組解析失敗」的行
+  const problemLines = analyses.filter(function (analysis) {
+    return analysis.status !== "valid";
+  });
+
+  // 若沒有任何問題行，隱藏整個提示區塊
+  if (problemLines.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+
+  section.style.display = "block";
+
+  problemLines.forEach(function (analysis) {
+    const listItem = document.createElement("li");
+
+    // 行級標題：第幾行、狀態摘要
+    const lineHeader = document.createElement("div");
+
+    // 計算失敗項目中，有幾項是「座標本身解析失敗」（type: group），
+    // 與幾項是「分隔符號錯誤」或「多餘內容」（type: separator / extra）
+    const groupTypeFailureCount = analysis.failedGroups.filter(function (failedGroup) {
+      return failedGroup.type === "group";
+    }).length;
+    const structuralFailureCount = analysis.failedGroups.length - groupTypeFailureCount;
+
+    let statusSummary;
+    if (analysis.status === "invalid") {
+      statusSummary = "完全無法解析";
+    } else if (groupTypeFailureCount === 0) {
+      // 座標本身都正確，問題出在分隔符號或多餘內容
+      statusSummary = "座標內容皆正確，但偵測到 " + structuralFailureCount + " 處分隔符號或內容異常";
+    } else {
+      statusSummary = "部分座標解析失敗（成功 " + analysis.validCount + " / " + analysis.totalGroups + " 組）";
+    }
+
+    lineHeader.textContent = "第 " + analysis.lineNumber + " 行：「" + analysis.rawLine + "」— " + statusSummary;
+    listItem.appendChild(lineHeader);
+
+    // 組級明細：具體是哪一組（或哪個部分）內容有問題、原因為何
+    if (analysis.failedGroups && analysis.failedGroups.length > 0) {
+      const detailList = document.createElement("ul");
+      detailList.className = "error-detail-list";
+
+      analysis.failedGroups.forEach(function (failedGroup) {
+        const detailItem = document.createElement("li");
+        detailItem.textContent = "第 " + failedGroup.index + " 組「" + failedGroup.text + "」：" + failedGroup.reason;
+        detailList.appendChild(detailItem);
+      });
+
+      listItem.appendChild(detailList);
+    }
+
+    list.appendChild(listItem);
+  });
+}
+
+/* ------------------------------------------------------------
+   模組九：狀態訊息顯示
+   ------------------------------------------------------------ */
+
+/**
+ * 更新畫面上的解析狀態訊息
+ * @param {Array<Object>} analyses - analyzeAllLines() 回傳的逐行分析結果
+ * @param {number} validCount - 成功解析的座標數
+ */
+function updateStatusMessage(analyses, validCount) {
+  const statusEl = document.getElementById("statusMsg");
+
+  const errorLineCount = analyses.filter(function (analysis) {
+    return analysis.status !== "valid";
+  }).length;
+
+  let messageText = "共解析出 " + validCount + " 筆有效座標";
+  if (errorLineCount > 0) {
+    messageText += "，" + errorLineCount + " 行解析異常（詳見下方提示）";
+  }
+
+  statusEl.textContent = messageText;
+}
+
+/* ------------------------------------------------------------
+   模組十：主流程綁定（事件監聽）
+   ------------------------------------------------------------ */
+
+/**
+ * 「解析」按鈕點擊事件處理主流程
+ * 此函式也會被自動解析（貼上/輸入內容後）呼叫，因此不論手動或自動觸發，
+ * 皆會同步更新結果表格、SkyVector 路線、狀態訊息與錯誤提示區塊。
+ */
+function handleParseButtonClick() {
+  const inputTextarea = document.getElementById("coordInput");
+  const rawText = inputTextarea.value;
+
+  // 逐行分析，取得每一行的解析狀態（valid / partial / invalid）
+  const analyses = analyzeAllLines(rawText);
+
+  // 將所有成功解析的座標攤平成單一陣列
+  const coordinates = [];
+  analyses.forEach(function (analysis) {
+    analysis.coordinates.forEach(function (item) {
+      coordinates.push(item);
+    });
+  });
+
+  // 渲染結果表格
+  renderResultTable(coordinates);
+
+  // 渲染 SkyVector 路線連結
+  renderRouteLink(coordinates);
+
+  // 渲染解析異常提示（若有無法解析或部分解析失敗的行）
+  renderErrorSection(analyses);
+
+  // 更新狀態訊息
+  updateStatusMessage(analyses, coordinates.length);
+}
+
+/**
+ * 「重新整理」按鈕點擊事件處理
+ * 直接強制重新整理整個頁面（相當於 Ctrl+F5），
+ * 可避免因瀏覽器快取舊版檔案、或畫面殘留舊狀態而導致的問題。
+ */
+function handleClearButtonClick() {
+  // reload(true) 會嘗試略過瀏覽器快取，強制向來源重新取得頁面內容
+  // （部分新版瀏覽器已不支援此參數，但呼叫時傳入不會造成錯誤，
+  //   且對於本機 HTML 檔案而言，reload() 本身即等同於重新載入整個頁面）
+  window.location.reload(true);
+}
+
+/* ------------------------------------------------------------
+   模組十一：自動解析（防抖動）
+   ------------------------------------------------------------ */
+
+// 用於自動解析的防抖動計時器（避免使用者每輸入一個字就立即解析一次）
+let autoParseDebounceTimer = null;
+
+/**
+ * 排程一次自動解析：若使用者在 500 毫秒內持續輸入或貼上內容，
+ * 會不斷延後執行時間，直到內容停止變動 500 毫秒後才真正觸發解析。
+ * 貼上文字時也會觸發瀏覽器的 input 事件，因此貼上後可自動解析。
+ */
+function scheduleAutoParse() {
+  if (autoParseDebounceTimer !== null) {
+    clearTimeout(autoParseDebounceTimer);
+  }
+  autoParseDebounceTimer = setTimeout(handleParseButtonClick, 500);
+}
+
+/**
+ * 初始化程式，綁定所有事件監聽器
+ */
+function initApp() {
+  const parseBtn = document.getElementById("parseBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const inputTextarea = document.getElementById("coordInput");
+
+  // 「解析」按鈕保留，可隨時手動立即解析（不受防抖動延遲影響）
+  parseBtn.addEventListener("click", handleParseButtonClick);
+  clearBtn.addEventListener("click", handleClearButtonClick);
+
+  // 監聽 textarea 的 input 事件（涵蓋貼上、輸入、刪除等所有內容變動），
+  // 並透過防抖動機制自動觸發解析
+  inputTextarea.addEventListener("input", scheduleAutoParse);
+}
+
+// 頁面載入完成後啟動程式
+document.addEventListener("DOMContentLoaded", initApp);
+</script>
+
+</body>
+</html>

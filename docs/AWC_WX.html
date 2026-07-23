@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aviation Weather 本地數據過濾系統 (SIGMET + METAR/TAF)</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+        h2 {
+            color: #0c4a6e;
+            border-bottom: 2px solid #0c4a6e;
+            padding-bottom: 8px;
+            margin-top: 0;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #0c4a6e;
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+        .grid-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        textarea {
+            width: 100%;
+            height: 140px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: monospace;
+            font-size: 13px;
+            resize: vertical;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #1e293b;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .time-info {
+            background-color: #fef08a;
+            color: #854d0e;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .primary-btn {
+            background-color: #0284c7;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .primary-btn:hover {
+            background-color: #0369a1;
+        }
+        
+        /* API 聯動按鈕與網址列組合樣式 */
+        .api-container {
+            margin-top: 4px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .api-go-btn {
+            display: inline-block;
+            width: 100%;
+            padding: 9px;
+            background-color: #e2e8f0;
+            color: #64748b;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            text-align: center;
+            text-decoration: none;
+            cursor: not-allowed;
+            box-sizing: border-box;
+            transition: all 0.2s;
+        }
+        .api-go-btn.active {
+            background-color: #0ea5e9;
+            color: white;
+            border-color: #0284c7;
+            cursor: pointer;
+        }
+        .api-go-btn.active:hover {
+            background-color: #0284c7;
+        }
+        .api-url-text {
+            font-size: 11px;
+            color: #64748b;
+            word-break: break-all;
+            padding: 2px 4px;
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+        }
+
+        .result-section {
+            margin-top: 25px;
+        }
+        .result-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .copy-btn {
+            background-color: #10b981;
+            color: white;
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            display: none;
+        }
+        .copy-btn:hover {
+            background-color: #059669;
+        }
+        .result-sub-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #475569;
+            margin-top: 15px;
+            margin-bottom: 6px;
+            border-left: 4px solid #64748b;
+            padding-left: 8px;
+        }
+        .output-container {
+            background-color: #1e293b;
+            color: #38bdf8;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 15px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+            margin-bottom: 15px;
+            min-height: 40px;
+        }
+        .output-container.metar-taf-theme {
+            color: #a7f3d0;
+        }
+        .no-result {
+            color: #64748b;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 6px;
+            border: 1px dashed #cbd5e1;
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>International SIGMETs & METAR/TAF 本地過濾系統</h2>
+    
+    <div class="time-info" id="currentTimeInfo">
+        過濾基準時間 (當下 UTC)：載入中...
+    </div>
+
+    <!-- 步驟 1: 資料匯入區 -->
+    <div class="section-title">
+        1. 匯入從 AWC 下載的 JSON / TXT 內容 (網頁另存為JSON / TXT檔)
+    </div>
+    
+    <!-- SIGMET API 按鈕配置於此 -->
+    <div class="api-container" style="max-width: 49.3%;">
+        <a id="sigmetApiBtn" class="api-go-btn active" target="_blank" href="https://aviationweather.gov/api/data/isigmet?format=json">🌐 開啟 AWC SIGMET JSON 網址</a>
+        <div class="api-url-text">https://aviationweather.gov/api/data/isigmet?format=json</div>
+    </div>
+    
+    <div class="grid-inputs">
+        <div class="form-group">
+            <label>請貼入 [SIGMET] JSON 內容：</label>
+            <textarea id="sigmetDataInput" placeholder="全選複製 SIGMET 網址內容並貼到這裡..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label>請貼入 [METAR + TAF] JSON 內容：</label>
+            <textarea id="metarDataInput" placeholder="全選複製下方按鈕獲取的 METAR+TAF 內容並貼到這裡..."></textarea>
+        </div>
+    </div>
+
+    <!-- 步驟 2: 條件設定區 -->
+    <div class="section-title">2. 設定過濾與查詢條件</div>
+    <div class="grid-inputs">
+        <div class="form-group">
+            <label for="firIds">目標 FIR ID (可輸入多個)</label>
+            <input type="text" id="firIds" placeholder="例如: RCAA, RJJJ (不分大小寫)">
+            <div class="hint">說明：用逗號或空格隔開。查無有效報告將顯示 NIL=</div>
+        </div>
+        <div class="form-group">
+            <label for="icaoIds">目標機場 ICAO ID (可輸入多個)</label>
+            <input type="text" id="icaoIds" placeholder="例如: RCSS RCTP VHHH (不分大小寫)">
+            <div class="hint">說明：用逗號或空格隔開。</div>
+            
+            <!-- METAR+TAF API 按鈕與動態網址顯示 -->
+            <div class="api-container" style="margin-bottom: 0;">
+                <a id="metarApiBtn" class="api-go-btn" target="_blank" href="javascript:void(0);">⚠️ 請先輸入機場 ICAO ID</a>
+                <div id="metarApiUrlText" class="api-url-text">https://aviationweather.gov/api/data/metar?ids=&format=json&taf=true</div>
+            </div>
+        </div>
+    </div>
+
+    <button type="button" class="primary-btn" id="filterBtn">開始過濾與產出資料</button>
+
+    <!-- 步驟 3: 結果顯示區 -->
+    <div class="result-section">
+        <div class="result-header-row">
+            <div class="section-title" style="margin: 0;">3. 篩選與產出結果</div>
+            <button type="button" class="copy-btn" id="copyAllBtn">📋 複製全部結果</button>
+        </div>
+        
+        <!-- 機場 METAR / TAF 顯示於上 -->
+        <div class="result-sub-title">機場 METAR / TAF 報告</div>
+        <div id="metarTafResultBlock" class="output-container metar-taf-theme"></div>
+        
+        <!-- SIGMET 顯示於下 -->
+        <div class="result-sub-title">區域 SIGMET 報告</div>
+        <div id="sigmetResultBlock" class="output-container"></div>
+    </div>
+</div>
+
+<script>
+    function updateUTCTime() {
+        const now = new Date();
+        document.getElementById('currentTimeInfo').textContent = `過濾基準時間 (當下時間)：${now.toISOString()} (Local) / ${now.toUTCString()}`;
+    }
+    updateUTCTime();
+    setInterval(updateUTCTime, 30000);
+
+    const icaoInput = document.getElementById('icaoIds');
+    const metarApiBtn = document.getElementById('metarApiBtn');
+    const metarApiUrlText = document.getElementById('metarApiUrlText');
+    const sigmetDataInput = document.getElementById('sigmetDataInput');
+    const metarDataInput = document.getElementById('metarDataInput');
+    const copyAllBtn = document.getElementById('copyAllBtn');
+
+    const metarTafResultBlock = document.getElementById('metarTafResultBlock');
+    const sigmetResultBlock = document.getElementById('sigmetResultBlock');
+
+    metarTafResultBlock.innerHTML = '<span class="no-result">尚未執行。請匯入 METAR JSON 資料。</span>';
+    sigmetResultBlock.innerHTML = '<span class="no-result">尚未執行。請匯入 SIGMET JSON 資料。</span>';
+
+    icaoInput.addEventListener('input', function() {
+        const inputVal = icaoInput.value.trim();
+        const cleanIds = inputVal.toUpperCase().split(/[\s,，]+/).filter(id => id.length > 0).join(',');
+        
+        if (cleanIds) {
+            const finalUrl = `https://aviationweather.gov/api/data/metar?ids=${cleanIds}&format=json&taf=true`;
+            metarApiBtn.href = finalUrl;
+            metarApiBtn.textContent = `🌐 開啟 AWC METAR+TAF JSON 網址 (${cleanIds})`;
+            metarApiBtn.classList.add('active');
+            metarApiUrlText.textContent = finalUrl;
+        } else {
+            metarApiBtn.href = `javascript:void(0);`;
+            metarApiBtn.textContent = `⚠️ 請先輸入機場 ICAO ID`;
+            metarApiBtn.classList.remove('active');
+            metarApiUrlText.textContent = `https://aviationweather.gov/api/data/metar?ids=&format=json&taf=true`;
+        }
+    });
+
+    document.getElementById('filterBtn').addEventListener('click', function() {
+        const sigmetRaw = sigmetDataInput.value.trim();
+        const metarRaw = metarDataInput.value.trim();
+        const firInput = document.getElementById('firIds').value.trim();
+        const icaoInputVal = icaoInput.value.trim();
+
+        // ----------------------------------------------
+        // PART A: METAR + TAF 處理 (精準定位至根層級物件欄位)
+        // ----------------------------------------------
+        let metarTafOutputText = "";
+        
+        if (icaoInputVal && !metarRaw) {
+            alert("已指定目標機場，請記得貼入 METAR+TAF 的 JSON 資料。");
+        }
+
+        if (metarRaw) {
+            let metarList = [];
+            try {
+                metarList = JSON.parse(metarRaw);
+                if (!Array.isArray(metarList) && metarList.data && Array.isArray(metarList.data)) {
+                    metarList = metarList.data;
+                }
+            } catch (e) {
+                alert(`METAR JSON 解析失敗: ${e.message}`);
+                return;
+            }
+
+            const targetIcaos = icaoInputVal ? [...new Set(icaoInputVal.toUpperCase().split(/[\s,，]+/).filter(id => id.length > 0))] : [];
+            let metarGroupsText = [];
+
+            targetIcaos.forEach(targetIcao => {
+                const matchedStation = metarList.find(item => item.icaoId && item.icaoId.toUpperCase() === targetIcao);
+                let currentGroupLines = [];
+
+                // 1. 讀取 METAR (rawOb)
+                if (matchedStation && matchedStation.rawOb) {
+                    currentGroupLines.push(matchedStation.rawOb.trim());
+                } else {
+                    currentGroupLines.push(`METAR ${targetIcao} NIL=`);
+                }
+
+                // 2. 讀取 TAF (根據範例，正確欄位是在同級別最外層的 rawTaf)
+                if (matchedStation && matchedStation.rawTaf) {
+                    currentGroupLines.push(matchedStation.rawTaf.trim());
+                } else {
+                    currentGroupLines.push(`TAF ${targetIcao} NIL=`);
+                }
+
+                metarGroupsText.push(currentGroupLines.join('\n'));
+            });
+
+            metarTafOutputText = metarGroupsText.join('\n\n');
+            metarTafResultBlock.textContent = metarTafOutputText || "無指定機場結果";
+        } else {
+            metarTafResultBlock.innerHTML = '<span class="no-result">未匯入或未執行 METAR 查詢。</span>';
+        }
+
+        // ----------------------------------------------
+        // PART B: SIGMET 處理
+        // ----------------------------------------------
+        let sigmetOutputText = "";
+
+        if (sigmetRaw) {
+            let sigmetList = [];
+            try {
+                sigmetList = JSON.parse(sigmetRaw);
+                if (!Array.isArray(sigmetList) && sigmetList.data && Array.isArray(sigmetList.data)) {
+                    sigmetList = sigmetList.data;
+                }
+            } catch (e) {
+                alert(`SIGMET JSON 解析失敗: ${e.message}`);
+                return;
+            }
+
+            const targetFirs = firInput ? [...new Set(firInput.toUpperCase().split(/[\s,，]+/).filter(id => id.length > 0))] : [];
+            const nowEpoch = Date.now(); 
+
+            const validSigmets = sigmetList.filter(item => (item.validTimeTo * 1000) > nowEpoch);
+            let sigmetTextList = [];
+            let foundFirSet = new Set();
+
+            if (targetFirs.length === 0) {
+                validSigmets.forEach(item => {
+                    if(item.rawSigmet) sigmetTextList.push(item.rawSigmet.trim());
+                });
+            } else {
+                validSigmets.forEach(item => {
+                    const itemFirId = item.firId ? item.firId.toUpperCase() : "";
+                    targetFirs.forEach(targetFir => {
+                        if (itemFirId.includes(targetFir)) {
+                            foundFirSet.add(targetFir);
+                            if(item.rawSigmet) sigmetTextList.push(item.rawSigmet.trim());
+                        }
+                    });
+                });
+
+                targetFirs.forEach(targetFir => {
+                    if (!foundFirSet.has(targetFir)) {
+                        sigmetTextList.push(`${targetFir} SIGMET NIL=`);
+                    }
+                });
+            }
+
+            sigmetOutputText = sigmetTextList.join('\n\n');
+            sigmetResultBlock.textContent = sigmetOutputText || "無符合條件的 SIGMET";
+        } else {
+            sigmetResultBlock.innerHTML = '<span class="no-result">未匯入或未執行 SIGMET 篩選。</span>';
+        }
+
+        if (metarTafOutputText || sigmetOutputText) {
+            copyAllBtn.style.display = 'inline-block';
+        } else {
+            copyAllBtn.style.display = 'none';
+        }
+    });
+
+    // 整合複製
+    copyAllBtn.addEventListener('click', function() {
+        const metarText = metarTafResultBlock.textContent.trim();
+        const sigmetText = sigmetResultBlock.textContent.trim();
+        let combinedArray = [];
+        
+        if (metarText && !metarTafResultBlock.querySelector('.no-result')) {
+            combinedArray.push(metarText);
+        }
+        if (sigmetText && !sigmetResultBlock.querySelector('.no-result')) {
+            combinedArray.push(sigmetText);
+        }
+
+        if (combinedArray.length === 0) return;
+
+        const textToCopy = combinedArray.join('\n\n');
+
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            const originalText = copyAllBtn.textContent;
+            copyAllBtn.textContent = '✅ 已全部整合複製！';
+            copyAllBtn.style.backgroundColor = '#059669';
+            
+            setTimeout(() => {
+                copyAllBtn.textContent = originalText;
+                copyAllBtn.style.backgroundColor = '#10b981';
+            }, 1500);
+        }).catch(err => {
+            alert('複製失敗：', err);
+        });
+    });
+</script>
+
+</body>
+</html>
