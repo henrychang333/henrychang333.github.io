@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>部門電子佈告欄</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Navbar -->
+  <header class="bg-slate-900 text-white sticky top-0 z-50 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-blue-600 p-2 rounded-lg">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-wide" id="dept-title">載入中...</h1>
+          <p class="text-xs text-slate-400">內部資訊整合佈告欄</p>
+        </div>
+      </div>
+      <div class="relative w-72 sm:w-96">
+        <input type="text" id="search-input" placeholder="搜尋公告標題、內文或附件..." class="w-full bg-slate-800 text-slate-200 text-sm pl-10 pr-4 py-2 rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500" oninput="handleSearch(this.value)">
+        <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主佈局 -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <aside class="lg:col-span-4 space-y-6">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2">公告分類</h2>
+        <nav id="category-list" class="space-y-1"></nav>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2">常用系統</h2>
+        <div id="quick-links" class="space-y-2"></div>
+      </div>
+    </aside>
+
+    <main class="lg:col-span-8">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div class="flex items-center justify-between pb-4 mb-6 border-b border-slate-100">
+          <div class="flex items-center space-x-2">
+            <h2 id="current-category-title" class="text-xl font-bold text-slate-800">載入中...</h2>
+            <span id="article-count" class="text-xs bg-slate-100 text-slate-600 font-medium px-2.5 py-1 rounded-full">0 則公告</span>
+          </div>
+        </div>
+        <div id="article-list" class="space-y-4"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let BOARD_DATA = { categories: [], quickLinks: [], articles: [] };
+    let currentCategoryId = "all";
+    let searchQuery = "";
+
+    // 載入 JSON 資料
+    document.addEventListener("DOMContentLoaded", async () => {
+      try {
+        const res = await fetch("./data.json");
+        BOARD_DATA = await res.json();
+        document.getElementById("dept-title").innerText = BOARD_DATA.departmentName;
+        renderCategories();
+        renderQuickLinks();
+        renderArticles();
+      } catch (err) {
+        alert("無法載入 data.json 檔案，請確認檔案路徑與 JSON 格式是否正確。");
+      }
+    });
+
+    function renderCategories() {
+      const container = document.getElementById("category-list");
+      container.innerHTML = "";
+      BOARD_DATA.categories.forEach(cat => {
+        const count = cat.id === "all" ? BOARD_DATA.articles.length : BOARD_DATA.articles.filter(a => a.categoryId === cat.id).length;
+        const isActive = cat.id === currentCategoryId;
+        const btn = document.createElement("button");
+        btn.className = `w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-100"}`;
+        btn.onclick = () => {
+          currentCategoryId = cat.id;
+          searchQuery = "";
+          document.getElementById("search-input").value = "";
+          renderCategories();
+          renderArticles();
+        };
+        btn.innerHTML = `<div class="flex items-center space-x-2.5"><span>${cat.icon}</span><span>${cat.name}</span></div><span class="text-xs px-2 py-0.5 rounded-full ${isActive ? 'bg-blue-200 text-blue-800' : 'bg-slate-100 text-slate-500'}">${count}</span>`;
+        container.appendChild(btn);
+      });
+    }
+
+    function renderQuickLinks() {
+      const container = document.getElementById("quick-links");
+      container.innerHTML = BOARD_DATA.quickLinks.map(link => `
+        <a href="${link.url}" target="_blank" class="flex items-center justify-between px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-blue-600 rounded-lg border border-transparent">
+          <div class="flex items-center space-x-2"><span>${link.icon}</span><span>${link.name}</span></div>
+          <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+        </a>
+      `).join('');
+    }
+
+    function handleSearch(query) {
+      searchQuery = query.trim().toLowerCase();
+      renderArticles();
+    }
+
+    function renderArticles() {
+      const container = document.getElementById("article-list");
+      const titleEl = document.getElementById("current-category-title");
+      const countEl = document.getElementById("article-count");
+
+      if (searchQuery) {
+        titleEl.innerText = `搜尋結果："${searchQuery}"`;
+      } else {
+        const currentCat = BOARD_DATA.categories.find(c => c.id === currentCategoryId);
+        titleEl.innerText = currentCat ? currentCat.name : "公告內容";
+      }
+
+      const filtered = BOARD_DATA.articles.filter(article => {
+        const matchesCategory = (currentCategoryId === "all" || article.categoryId === currentCategoryId);
+        if (!searchQuery) return matchesCategory;
+        const matchesTitle = article.title.toLowerCase().includes(searchQuery);
+        const matchesContent = article.content.toLowerCase().includes(searchQuery);
+        const matchesAttachment = article.attachments.some(att => att.name.toLowerCase().includes(searchQuery));
+        return matchesCategory && (matchesTitle || matchesContent || matchesAttachment);
+      });
+
+      countEl.innerText = `${filtered.length} 則公告`;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="text-center py-12"><p class="text-slate-400">目前沒有相關公告。</p></div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(article => `
+        <article class="border border-slate-200 rounded-lg p-5 bg-white shadow-sm">
+          <div class="flex items-start justify-between gap-4 mb-2">
+            <h3 class="text-base font-bold text-slate-900">
+              ${article.isUrgent ? `<span class="bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded mr-1.5">緊急</span>` : ''}
+              ${escapeHtml(article.title)}
+            </h3>
+            <span class="text-xs text-slate-400 whitespace-nowrap">${article.date}</span>
+          </div>
+          <div class="text-xs text-slate-500 mb-3">發佈單位：${escapeHtml(article.author)}</div>
+          <p class="text-sm text-slate-600 leading-relaxed mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100">${escapeHtml(article.content)}</p>
+          ${article.attachments && article.attachments.length > 0 ? `
+            <div class="pt-3 border-t border-slate-100">
+              <span class="text-xs font-semibold text-slate-500 block mb-2">📎 相關附件下載：</span>
+              <div class="flex flex-wrap gap-2">
+                ${article.attachments.map(file => `
+                  <a href="${file.url}" download class="inline-flex items-center space-x-1.5 text-xs bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 px-3 py-1.5 rounded-md border border-slate-200">
+                    <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <span>${escapeHtml(file.name)}</span>
+                  </a>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </article>
+      `).join('');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+    }
+  </script>
+</body>
+</html>
