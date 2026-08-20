@@ -1,0 +1,42 @@
+{
+  "departmentName": "產品研發二部 (R&D Dept. II)",
+  "categories": [
+    { "id": "all", "name": "全部公告", "icon": "📌" },
+    { "id": "guidelines", "name": "最新作業須知", "icon": "📢" },
+    { "id": "docs", "name": "參考文件與規範", "icon": "📑" },
+    { "id": "minutes", "name": "會議紀錄", "icon": "📝" },
+    { "id": "reports", "name": "每日報告與表單", "icon": "📊" }
+  ],
+  "quickLinks": [
+    { "name": "公司企業 Portal", "url": "http://portal.company.local", "icon": "🌐" },
+    { "name": "IT 線上報修系統", "url": "http://itservice.company.local", "icon": "🛠️" },
+    { "name": "請假與加班申請系統", "url": "http://hr.company.local", "icon": "📅" }
+  ],
+  "articles": [
+    {
+      "id": 101,
+      "categoryId": "guidelines",
+      "title": "【緊急】2026 Q3 資安防護演練與社交工程郵件應對作業流程",
+      "isUrgent": true,
+      "date": "2026-08-18",
+      "author": "資訊安全小組",
+      "content": "請全體同仁於本週五 (08/21) 前完成社交工程演練說明文件閱讀。若收到可疑外來郵件，請勿點擊連結，並立即使用 Outlook 資安通報套件進行通報。",
+      "attachments": [
+        { "name": "2026_資安演練應對步驟說明.pdf", "url": "./files/2026_sec_guide.pdf" },
+        { "name": "通報流程卡.png", "url": "./files/notice_flow.png" }
+      ]
+    },
+    {
+      "id": 102,
+      "categoryId": "docs",
+      "title": "前端程式碼開發規範與 Code Review 標準作業程序 (SOP) v2.1",
+      "isUrgent": false,
+      "date": "2026-08-15",
+      "author": "系統架構組",
+      "content": "本次更新新增了關於 CSS 架構與元件設計的命名規範，並修訂了 Pull Request 的審核標準，即日起發佈之版本請全面遵守。",
+      "attachments": [
+        { "name": "前端開發規範指南_v2.1.pdf", "url": "./files/frontend_coding_standards_v2.1.pdf" }
+      ]
+    }
+  ]
+}
