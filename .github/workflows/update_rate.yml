@@ -1,0 +1,59 @@
+name: 匯率報表排程
+
+on:
+  schedule:
+    # cron 使用 UTC 時間。台灣(UTC+8) 下午4:00/4:30/5:00 = UTC 08:00/08:30/09:00
+    # 週一到週五 (1-5)
+    - cron: '0,30 8-9 * * 1-5'
+  workflow_dispatch:  # 允許手動觸發，方便測試
+
+# 避免上一次還沒跑完，下一次又觸發造成衝突
+concurrency:
+  group: rate-report
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # 需要寫入權限才能 commit / push 更新後的 html
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    env:
+      CI: "true"
+      OUTPUT_PATH: ${{ github.workspace }}/docs/rate_report.html
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: 執行匯率報表腳本
+        working-directory: scripts
+        run: python rate.py
+
+      - name: 檢查輸出檔案是否存在
+        run: |
+          if [ ! -f "docs/rate_report.html" ]; then
+            echo "找不到 docs/rate_report.html，腳本可能執行失敗"
+            exit 1
+          fi
+
+      - name: Commit 並 push 更新
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/rate_report.html
+          if git diff --staged --quiet; then
+            echo "沒有變動，略過 commit"
+          else
+            git commit -m "自動更新匯率報表 $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
